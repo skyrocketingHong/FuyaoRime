@@ -1,0 +1,11 @@
+# macOS
+.DS_Store
+
+# 忽略 upstream 目录（运行时下载）
+upstream/
+
+# 忽略 output 目录（构建产物）
+output/
+
+# 忽略临时文件
+*.zip

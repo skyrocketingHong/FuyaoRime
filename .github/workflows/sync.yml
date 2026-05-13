@@ -1,0 +1,75 @@
+name: Sync Rime Dictionaries
+
+on:
+  schedule:
+    # 每周日凌晨 2:00 UTC (北京时间 10:00)
+    - cron: '0 2 * * 0'
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Clone rime-ice
+        run: |
+          git clone --depth 1 https://github.com/iDvel/rime-ice.git upstream/rime-ice
+
+      - name: Download wanxiang grammar
+        run: |
+          mkdir -p upstream/wanxiang
+          # 下载万象拼音语言模型
+          curl -L -o upstream/wanxiang/wanxiang-lts-zh-hans.gram \
+            "https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hans.gram"
+          # 获取版本号
+          curl -s "https://api.github.com/repos/amzxyz/RIME-LMDG/releases/tags/LTS" | \
+            python3 -c "import sys,json; data=json.load(sys.stdin); \
+            assets=[a for a in data['assets'] if a['name']=='wanxiang-lts-zh-hans.gram']; \
+            print(assets[0]['updated_at'].split('T')[0].replace('-','') if assets else '')" \
+            > upstream/wanxiang/version.txt
+
+      - name: Download extra dictionaries
+        run: |
+          python3 scripts/update_dicts.py
+
+      - name: Merge files
+        run: |
+          chmod +x scripts/merge.sh
+          bash scripts/merge.sh
+
+      - name: Create release package
+        run: |
+          cd output
+          zip -r ../fuyaorime-$(date +%Y%m%d).zip .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+        with:
+          tag_name: v$(date +%Y%m%d)
+          name: FuyaoRime $(date +%Y-%m-%d)
+          body: |
+            自动同步的 Rime 配置包
+            
+            ## 包含内容
+            - 雾凇拼音最新词库
+            - 万象拼音语言模型
+            - 自定义词库（维基百科、萌娘百科等）
+            - 自定义皮肤和配置
+            
+            ## 使用方法
+            1. 下载 `fuyaorime-*.zip`
+            2. 解压到 Rime 配置目录
+            3. 重新部署
+          files: fuyaorime-*.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

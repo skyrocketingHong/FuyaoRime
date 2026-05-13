@@ -1,4 +1,4 @@
-# Rime AutoSync
+# FuyaoRime
 
 自动同步 [雾凇拼音](https://github.com/iDvel/rime-ice) 和 [万象拼音](https://github.com/amzxyz/rime_wanxiang) 的 Rime 输入法配置仓库。
 
@@ -40,7 +40,7 @@
 ### 方法一：下载 Release 包（推荐）
 
 1. 前往 [Releases](../../releases) 页面
-2. 下载最新的 `rime-sync-*.zip`
+2. 下载最新的 `fuyaorime-*.zip`
 3. 解压到 Rime 配置目录：
    - macOS: `~/Library/Rime/`
    - Windows: `%APPDATA%\Rime\`
@@ -51,8 +51,8 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/YOUR_USERNAME/Rime-AutoSync.git
-cd Rime-AutoSync
+git clone https://github.com/YOUR_USERNAME/FuyaoRime.git
+cd FuyaoRime
 
 # 运行合并脚本
 chmod +x scripts/merge.sh
@@ -65,7 +65,7 @@ cp -r output/* ~/Library/Rime/
 ## 目录结构
 
 ```
-Rime-AutoSync/
+FuyaoRime/
 ├── .github/workflows/
 │   └── sync.yml              # GitHub Actions 工作流
 ├── overlay/                  # 自定义配置（覆盖上游）
