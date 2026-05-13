@@ -1,0 +1,76 @@
+patch:
+  preset_color_schemes:
+    bohelv:
+      color_space: srgb
+      color_format: abgr
+      back_color: '0xB4FFFFFF'
+      hilited_candidate_back_color: '0x264C7F20'
+      border_color: '0xB4FFFFFF'
+      text_color: '0x4C7F20'
+      candidate_text_color: '0x454545'
+      hilited_candidate_text_color: '0x4C7F20'
+      label_color: '0x8E8E8E'
+      name: "薄荷绿"
+    bohelv_dark:
+      color_space: srgb
+      color_format: abgr
+      back_color: '0xB4000000'
+      hilited_candidate_back_color: '0xCB4C7F20'
+      border_color: '0xB4000000'
+      text_color: '0xFFFFFF'
+      hilited_label_color: '0xFFFFFF'
+      candidate_text_color: '0xBABABA'
+      hilited_candidate_text_color: '0xFFFFFF'
+      label_color: '0x717171'
+      name: "薄荷绿·暗"
+    citrus:
+      color_space: srgb
+      color_format: abgr
+      back_color: '0xE6FFFFFF'
+      hilited_candidate_back_color: '0xE63FB797'
+      border_color: '0xE6FFFFFF'
+      text_color: '0x3FB797'
+      candidate_text_color: '0x333333'
+      hilited_candidate_text_color: '0xFFFFFF'
+      label_color: '0x8E8E8E'
+      name: "柑橘黄色 (Citrus)"
+    citrus_dark:
+      color_space: srgb
+      color_format: abgr
+      back_color: '0xE61A1A1A'
+      hilited_candidate_back_color: '0xCC3FB797'
+      border_color: '0xE61A1A1A'
+      text_color: '0xCCCCCC'
+      hilited_label_color: '0xCCCCCC'
+      candidate_text_color: '0xAAAAAA'
+      hilited_candidate_text_color: '0xFFFFFF'
+      label_color: '0x717171'
+      name: "柑橘黄色·暗 (Citrus Dark)"
+  style:
+    status_message_type: mix
+    candidate_format: '[label]. [candidate] [comment]'
+    candidate_list_layout: linear
+    text_orientation: horizontal
+    inline_preedit: true
+    inline_candidate: false
+    translucency: true
+    mutual_exclusive: false
+    memorize_size: true
+    showPaging: false
+    alpha: 1e+0
+    corner_radius: 8e+0
+    hilited_corner_radius: 8e+0
+    border_height: 0e+0
+    border_width: 0e+0
+    line_spacing: 1e+0
+    spacing: 0e+0
+    shadow_size: 2e-1
+    font_point: 16
+    font_face: "SF Pro Display, Noto Sans, Apple Color Emoji, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB, SimSun-ExtG, Segoe UI Symbol, Unifont"
+    label_font_point: 10
+    label_font_face: "SF Compact Display"
+    comment_font_point: 8
+    comment_font_face: "SF Pro Display, Noto Sans, Apple Color Emoji, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB, SimSun-ExtG, Segoe UI Symbol, Unifont"
+    horizontal: true
+    color_scheme: citrus
+    color_scheme_dark: citrus_dark
