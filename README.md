@@ -115,3 +115,4 @@ FuyaoRime/
 - [felixonmars/fcitx5-pinyin-zhwiki](https://github.com/felixonmars/fcitx5-pinyin-zhwiki) - 维基百科、维基文库、维基词典、网络俚语词库
 - [outloudvi/mw2fcitx](https://github.com/outloudvi/mw2fcitx) - 萌娘百科词库
 - [搜狗词库](https://pinyin.sogou.com) - 中国地名、流行新词词库
+- [studyzy/imewlconverter](https://github.com/studyzy/imewlconverter) - 深蓝词库转换工具
