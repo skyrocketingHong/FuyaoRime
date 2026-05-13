@@ -1,11 +1,44 @@
 # macOS
 .DS_Store
+**/.DS_Store
+.AppleDouble
+.LSOverride
 
-# 忽略 upstream 目录（运行时下载）
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
+.directory
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 运行时目录
 upstream/
-
-# 忽略 output 目录（构建产物）
 output/
 
-# 忽略临时文件
+# 构建产物
 *.zip
+*.tar.gz
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# 临时文件
+*.tmp
+*.bak
+*.log
