@@ -110,6 +110,8 @@ FuyaoRime/
 ## 致谢
 
 - [iDvel/rime-ice](https://github.com/iDvel/rime-ice) - 雾凇拼音
-- [amzxyz/rime_wanxiang](https://github.com/amzxyz/rime_wanxiang) - 万象拼音
-- [felixonmars/fcitx5-pinyin-zhwiki](https://github.com/felixonmars/fcitx5-pinyin-zhwiki) - 维基百科词库
+- [amzxyz/RIME-LMDG](https://github.com/amzxyz/RIME-LMDG) - 万象拼音语言模型
+- [amzxyz/rime_wanxiang](https://github.com/amzxyz/rime_wanxiang) - 万象拼音用户预测
+- [felixonmars/fcitx5-pinyin-zhwiki](https://github.com/felixonmars/fcitx5-pinyin-zhwiki) - 维基百科、维基文库、维基词典、网络俚语词库
 - [outloudvi/mw2fcitx](https://github.com/outloudvi/mw2fcitx) - 萌娘百科词库
+- [搜狗词库](https://pinyin.sogou.com) - 中国地名、流行新词词库
