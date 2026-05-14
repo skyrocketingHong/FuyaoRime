@@ -36,7 +36,11 @@ cp "$UPSTREAM_DIR/LICENSE" "$OUTPUT_DIR/"
 
 # 复制子目录
 cp -r "$UPSTREAM_DIR/cn_dicts" "$OUTPUT_DIR/"
-cp -r "$UPSTREAM_DIR/en_dicts" "$OUTPUT_DIR/"
+# 只复制全拼需要的英文词典，跳过双拼专用的 cn_en_*.txt
+mkdir -p "$OUTPUT_DIR/en_dicts"
+cp "$UPSTREAM_DIR/en_dicts/cn_en.txt" "$OUTPUT_DIR/en_dicts/"
+cp "$UPSTREAM_DIR/en_dicts/en.dict.yaml" "$OUTPUT_DIR/en_dicts/"
+cp "$UPSTREAM_DIR/en_dicts/en_ext.dict.yaml" "$OUTPUT_DIR/en_dicts/"
 cp -r "$UPSTREAM_DIR/opencc" "$OUTPUT_DIR/"
 cp -r "$UPSTREAM_DIR/lua" "$OUTPUT_DIR/"
 
