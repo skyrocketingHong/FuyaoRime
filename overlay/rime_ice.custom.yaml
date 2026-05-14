@@ -1,7 +1,10 @@
 patch:
-  'engine/processors/select_character/@next': lua_processor@*user_predict*P
-  'engine/translators/@next': lua_translator@*user_predict*T
-  'engine/filters/@next': lua_filter@*user_predict*F
+  engine/processors/+:
+    - lua_processor@*user_predict*P
+  engine/translators/+:
+    - lua_translator@*user_predict*T
+  engine/filters/+:
+    - lua_filter@*user_predict*F
   switches/+:
     - name: prediction
       states: [ 预测关, 预测开 ]
