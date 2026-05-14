@@ -29,6 +29,10 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/iDvel/rime-ice.git upstream/rime-ice
 
+      - name: Clone rime_wanxiang
+        run: |
+          git clone --depth 1 https://github.com/amzxyz/rime_wanxiang.git upstream/rime_wanxiang
+
       - name: Download wanxiang grammar
         run: |
           mkdir -p upstream/wanxiang
