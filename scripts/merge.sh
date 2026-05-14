@@ -18,9 +18,21 @@ mkdir -p "$OUTPUT_DIR"
 
 # 1. 复制雾凇拼音核心文件
 echo "[1/5] 复制雾凇拼音核心文件..."
-cp "$UPSTREAM_DIR"/*.yaml "$OUTPUT_DIR/"
+# 只复制需要的 schema 文件（全拼、英文、部首拼音）
+for schema in rime_ice.schema.yaml melt_eng.schema.yaml radical_pinyin.schema.yaml; do
+    cp "$UPSTREAM_DIR/$schema" "$OUTPUT_DIR/" 2>/dev/null || true
+done
+# 复制其他配置文件
+cp "$UPSTREAM_DIR/default.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
+cp "$UPSTREAM_DIR/rime_ice.dict.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
+cp "$UPSTREAM_DIR/melt_eng.dict.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
+cp "$UPSTREAM_DIR/radical_pinyin.dict.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
+cp "$UPSTREAM_DIR/symbols_v.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
+cp "$UPSTREAM_DIR/symbols_caps_v.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
+cp "$UPSTREAM_DIR/user.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
+cp "$UPSTREAM_DIR/recipe.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
 cp "$UPSTREAM_DIR"/*.txt "$OUTPUT_DIR/" 2>/dev/null || true
-cp "$UPSTREAM_DIR"/LICENSE "$OUTPUT_DIR/"
+cp "$UPSTREAM_DIR/LICENSE" "$OUTPUT_DIR/"
 
 # 复制子目录
 cp -r "$UPSTREAM_DIR/cn_dicts" "$OUTPUT_DIR/"
