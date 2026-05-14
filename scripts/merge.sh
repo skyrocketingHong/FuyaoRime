@@ -27,7 +27,11 @@ cp -r "$UPSTREAM_DIR/cn_dicts" "$OUTPUT_DIR/"
 cp -r "$UPSTREAM_DIR/en_dicts" "$OUTPUT_DIR/"
 cp -r "$UPSTREAM_DIR/opencc" "$OUTPUT_DIR/"
 cp -r "$UPSTREAM_DIR/lua" "$OUTPUT_DIR/"
-cp -r "$UPSTREAM_DIR/others" "$OUTPUT_DIR/"
+
+# 只复制 others 中的必要文件，跳过文档和资源
+mkdir -p "$OUTPUT_DIR/others"
+cp "$UPSTREAM_DIR/others/cn_en.txt" "$OUTPUT_DIR/others/" 2>/dev/null || true
+cp "$UPSTREAM_DIR/others/emoji-map.txt" "$OUTPUT_DIR/others/" 2>/dev/null || true
 
 # 2. 复制万象拼音语言模型和脚本
 echo "[2/5] 复制万象拼音语言模型和脚本..."
