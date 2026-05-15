@@ -58,25 +58,115 @@ jobs:
           cd output
           zip -r ../fuyaorime-${{ env.DATE }}.zip .
 
+      - name: Generate release notes
+        run: |
+          echo "# FuyaoRime ${{ env.DATE }}" > release_notes.md
+          echo "" >> release_notes.md
+          echo "自动同步的 Rime 配置包" >> release_notes.md
+          echo "" >> release_notes.md
+
+          # 获取上一次的release tag
+          PREV_TAG=$(git tag --sort=-creatordate | grep '^v[0-9]' | head -n 1)
+          HAS_CHANGES=false
+
+          echo "## 上游更新" >> release_notes.md
+          echo "" >> release_notes.md
+
+          # 雾凇拼音对比
+          echo "### 雾凇拼音 (rime-ice)" >> release_notes.md
+          cd upstream/rime-ice
+          if [ -n "$PREV_TAG" ]; then
+            # 获取上次tag对应的上游commit
+            PREV_COMMIT=$(git rev-list -n 1 "$PREV_TAG" 2>/dev/null || echo "")
+            if [ -n "$PREV_COMMIT" ] && [ "$PREV_COMMIT" != "$(git rev-parse HEAD)" ]; then
+              CHANGES=$(git log "$PREV_COMMIT..HEAD" --format="- %h %s (%cd)" --date=short 2>/dev/null)
+              if [ -n "$CHANGES" ]; then
+                echo "$CHANGES" >> ../../release_notes.md
+                HAS_CHANGES=true
+              else
+                echo "- 无更新" >> ../../release_notes.md
+              fi
+            else
+              echo "- 无更新" >> ../../release_notes.md
+            fi
+          else
+            echo "- 首次同步" >> ../../release_notes.md
+          fi
+          cd ../..
+
+          # 万象拼音对比
+          echo "### 万象拼音 (rime_wanxiang)" >> release_notes.md
+          cd upstream/rime_wanxiang
+          if [ -n "$PREV_TAG" ]; then
+            PREV_COMMIT=$(git rev-list -n 1 "$PREV_TAG" 2>/dev/null || echo "")
+            if [ -n "$PREV_COMMIT" ] && [ "$PREV_COMMIT" != "$(git rev-parse HEAD)" ]; then
+              CHANGES=$(git log "$PREV_COMMIT..HEAD" --format="- %h %s (%cd)" --date=short 2>/dev/null)
+              if [ -n "$CHANGES" ]; then
+                echo "$CHANGES" >> ../../release_notes.md
+                HAS_CHANGES=true
+              else
+                echo "- 无更新" >> ../../release_notes.md
+              fi
+            else
+              echo "- 无更新" >> ../../release_notes.md
+            fi
+          else
+            echo "- 首次同步" >> ../../release_notes.md
+          fi
+          cd ../..
+
+          # 语言模型版本
+          echo "### 语言模型" >> release_notes.md
+          if [ -f upstream/wanxiang/version.txt ]; then
+            gram_version=$(cat upstream/wanxiang/version.txt)
+            echo "- 万象语言模型版本: $gram_version" >> release_notes.md
+          fi
+          echo "" >> release_notes.md
+
+          # 获取自定义词库更新信息
+          echo "## 自定义词库更新" >> release_notes.md
+          echo "" >> release_notes.md
+
+          # 检查各个词库文件是否有更新
+          for dict_file in output/*.dict.yaml; do
+            if [ -f "$dict_file" ]; then
+              filename=$(basename "$dict_file")
+              mod_date=$(date -r "$dict_file" "+%Y-%m-%d %H:%M")
+              echo "- $filename (更新于 $mod_date)" >> release_notes.md
+              HAS_CHANGES=true
+            fi
+          done
+          echo "" >> release_notes.md
+
+          # 如果没有任何更新，显示例行更新
+          if [ "$HAS_CHANGES" = false ]; then
+            echo "## 更新说明" >> release_notes.md
+            echo "" >> release_notes.md
+            echo "- 例行更新，上游无变更" >> release_notes.md
+            echo "" >> release_notes.md
+          fi
+
+          # 包含内容说明
+          echo "## 包含内容" >> release_notes.md
+          echo "- 雾凇拼音最新词库" >> release_notes.md
+          echo "- 万象拼音语言模型" >> release_notes.md
+          echo "- 自定义词库（维基百科、萌娘百科等）" >> release_notes.md
+          echo "- 自定义皮肤和配置" >> release_notes.md
+          echo "" >> release_notes.md
+
+          # 使用方法
+          echo "## 使用方法" >> release_notes.md
+          echo "1. 下载 \`fuyaorime-*.zip\`" >> release_notes.md
+          echo "2. 解压到 Rime 配置目录" >> release_notes.md
+          echo "3. 重新部署" >> release_notes.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
         with:
           tag_name: v${{ env.DATE }}
           name: FuyaoRime ${{ env.DATE }}
-          body: |
-            自动同步的 Rime 配置包
-            
-            ## 包含内容
-            - 雾凇拼音最新词库
-            - 万象拼音语言模型
-            - 自定义词库（维基百科、萌娘百科等）
-            - 自定义皮肤和配置
-            
-            ## 使用方法
-            1. 下载 `fuyaorime-*.zip`
-            2. 解压到 Rime 配置目录
-            3. 重新部署
+          body_path: release_notes.md
           files: fuyaorime-${{ env.DATE }}.zip
           draft: false
           prerelease: false
