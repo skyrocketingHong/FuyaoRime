@@ -174,3 +174,11 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update hash files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add scripts/.rime_ice_hash scripts/.wanxiang_hash
+          git diff --cached --quiet || git commit -m "chore: 更新上游仓库 hash 记录"
+          git push
