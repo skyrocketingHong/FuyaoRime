@@ -60,9 +60,7 @@ jobs:
 
       - name: Generate release notes
         run: |
-          echo "# FuyaoRime ${{ env.DATE }}" > release_notes.md
-          echo "" >> release_notes.md
-          echo "自动同步的 Rime 配置包" >> release_notes.md
+          echo "自动同步的 Rime 配置包" > release_notes.md
           echo "" >> release_notes.md
 
           HAS_CHANGES=false
