@@ -73,13 +73,12 @@ jobs:
           # 雾凇拼音对比
           echo "### 雾凇拼音 (rime-ice)" >> release_notes.md
           cd upstream/rime-ice
-          CURRENT_HASH=$(git rev-parse HEAD)
+          CURRENT_HASH=$(git rev-parse --short HEAD)
           cd ../..
           if [ -f "$RIME_ICE_HASH_FILE" ]; then
             PREV_HASH=$(cat "$RIME_ICE_HASH_FILE")
             if [ "$CURRENT_HASH" != "$PREV_HASH" ]; then
-              # 获取具体的提交信息
-              CHANGES=$(cd upstream/rime-ice && git log --format="- %h %s (%cd)" --date=short -10 2>/dev/null)
+              CHANGES=$(cd upstream/rime-ice && git log --format="- [%h](https://github.com/iDvel/rime-ice/commit/%H) %s (%cd)" --date=short "$PREV_HASH..HEAD" 2>/dev/null)
               if [ -n "$CHANGES" ]; then
                 echo "$CHANGES" >> release_notes.md
                 HAS_CHANGES=true
@@ -87,21 +86,18 @@ jobs:
             else
               echo "- 无更新" >> release_notes.md
             fi
-          else
-            echo "- 首次同步" >> release_notes.md
-            HAS_CHANGES=true
           fi
           echo "$CURRENT_HASH" > "$RIME_ICE_HASH_FILE"
 
           # 万象拼音对比
           echo "### 万象拼音 (rime_wanxiang)" >> release_notes.md
           cd upstream/rime_wanxiang
-          CURRENT_HASH=$(git rev-parse HEAD)
+          CURRENT_HASH=$(git rev-parse --short HEAD)
           cd ../..
           if [ -f "$WANXIANG_HASH_FILE" ]; then
             PREV_HASH=$(cat "$WANXIANG_HASH_FILE")
             if [ "$CURRENT_HASH" != "$PREV_HASH" ]; then
-              CHANGES=$(cd upstream/rime_wanxiang && git log --format="- %h %s (%cd)" --date=short -10 2>/dev/null)
+              CHANGES=$(cd upstream/rime_wanxiang && git log --format="- [%h](https://github.com/amzxyz/rime_wanxiang/commit/%H) %s (%cd)" --date=short "$PREV_HASH..HEAD" 2>/dev/null)
               if [ -n "$CHANGES" ]; then
                 echo "$CHANGES" >> release_notes.md
                 HAS_CHANGES=true
@@ -109,9 +105,6 @@ jobs:
             else
               echo "- 无更新" >> release_notes.md
             fi
-          else
-            echo "- 首次同步" >> release_notes.md
-            HAS_CHANGES=true
           fi
           echo "$CURRENT_HASH" > "$WANXIANG_HASH_FILE"
 
