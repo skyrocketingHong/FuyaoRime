@@ -10,15 +10,15 @@ patch:
       states: [ 预测关, 预测开 ]
       reset: 0
   "grammar/language": "wanxiang-lts-zh-hans"
-  "grammar/collocation_max_length": 6
-  "grammar/collocation_min_length": 3
-  "grammar/collocation_penalty": -10
-  "grammar/non_collocation_penalty": -20
-  "grammar/weak_collocation_penalty": -45
+  "grammar/collocation_max_length": 8
+  "grammar/collocation_min_length": 2
+  "grammar/collocation_penalty": -16
+  "grammar/non_collocation_penalty": -8
+  "grammar/weak_collocation_penalty": -100
   "grammar/rear_penalty": -12
   "translator/contextual_suggestions": false
-  "translator/max_homophones": 5
-  "translator/max_homographs": 5
+  "translator/max_homophones": 7
+  "translator/max_homographs": 7
   "translator/dictionary": rime_ice.custom # 挂载词库 rime_ice.custom.dict.yaml
   schema_list:
     - schema: rime_ice # 雾凇拼音（全拼）
