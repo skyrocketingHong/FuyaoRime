@@ -21,7 +21,6 @@
 
 ### 来自万象拼音
 - 语言模型 (wanxiang-lts-zh-hans.gram)
-- 用户预测功能 (user_predict.lua)
 
 ### 自定义内容
 - macOS 皮肤（薄荷绿/柑橘黄）
@@ -75,8 +74,6 @@ FuyaoRime/
 │   ├── rime_ice.custom.yaml  # 雾凇自定义
 │   ├── rime_ice.custom.dict.yaml  # 自定义词典配置
 │   ├── custom_phrase.txt     # 自定义短语
-│   └── lua/
-│       └── user_predict.lua  # 用户预测
 ├── custom_dicts/             # 额外词库
 ├── scripts/
 │   ├── merge.sh              # 合并脚本
@@ -111,7 +108,6 @@ FuyaoRime/
 
 - [iDvel/rime-ice](https://github.com/iDvel/rime-ice) - 雾凇拼音
 - [amzxyz/RIME-LMDG](https://github.com/amzxyz/RIME-LMDG) - 万象拼音语言模型
-- [amzxyz/rime_wanxiang](https://github.com/amzxyz/rime_wanxiang) - 万象拼音用户预测
 - [felixonmars/fcitx5-pinyin-zhwiki](https://github.com/felixonmars/fcitx5-pinyin-zhwiki) - 维基百科、维基文库、维基词典、网络俚语词库
 - [outloudvi/mw2fcitx](https://github.com/outloudvi/mw2fcitx) - 萌娘百科词库
 - [搜狗词库](https://pinyin.sogou.com) - 中国地名、流行新词词库

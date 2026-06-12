@@ -57,11 +57,6 @@ if [ -f "$PROJECT_DIR/upstream/wanxiang/wanxiang-lts-zh-hans.gram" ]; then
         cp "$PROJECT_DIR/upstream/wanxiang/version.txt" "$OUTPUT_DIR/wanxiang-lts-zh-hans.gram.version"
     fi
 fi
-# 从万象拼音仓库获取 user_predict.lua
-if [ -f "$PROJECT_DIR/upstream/rime_wanxiang/lua/wanxiang/user_predict.lua" ]; then
-    mkdir -p "$OUTPUT_DIR/lua"
-    cp "$PROJECT_DIR/upstream/rime_wanxiang/lua/wanxiang/user_predict.lua" "$OUTPUT_DIR/lua/"
-fi
 
 # 3. 复制自定义词库
 echo "[3/5] 复制自定义词库..."
