@@ -87,22 +87,22 @@ jobs:
           fi
           echo "$CURRENT_HASH" > "$RIME_ICE_HASH_FILE"
 
-          # 万象拼音对比
-          echo "### 万象拼音 (rime_wanxiang)" >> release_notes.md
-          cd upstream/rime_wanxiang
-          CURRENT_HASH=$(git rev-parse --short HEAD)
-          cd ../..
-          if [ -f "$WANXIANG_HASH_FILE" ]; then
-            PREV_HASH=$(cat "$WANXIANG_HASH_FILE")
-            if [ "$CURRENT_HASH" != "$PREV_HASH" ]; then
-              CHANGES=$(cd upstream/rime_wanxiang && git log -1 --format="- [%h](https://github.com/amzxyz/rime_wanxiang/commit/%H) %s (%cd)" --date=short 2>/dev/null)
-              echo "$CHANGES" >> release_notes.md
-              HAS_CHANGES=true
-            else
-              echo "- 无更新" >> release_notes.md
-            fi
-          fi
-          echo "$CURRENT_HASH" > "$WANXIANG_HASH_FILE"
+          # # 万象拼音对比
+          # echo "### 万象拼音 (rime_wanxiang)" >> release_notes.md
+          # cd upstream/rime_wanxiang
+          # CURRENT_HASH=$(git rev-parse --short HEAD)
+          # cd ../..
+          # if [ -f "$WANXIANG_HASH_FILE" ]; then
+          #   PREV_HASH=$(cat "$WANXIANG_HASH_FILE")
+          #   if [ "$CURRENT_HASH" != "$PREV_HASH" ]; then
+          #     CHANGES=$(cd upstream/rime_wanxiang && git log -1 --format="- [%h](https://github.com/amzxyz/rime_wanxiang/commit/%H) %s (%cd)" --date=short 2>/dev/null)
+          #     echo "$CHANGES" >> release_notes.md
+          #     HAS_CHANGES=true
+          #   else
+          #     echo "- 无更新" >> release_notes.md
+          #   fi
+          # fi
+          # echo "$CURRENT_HASH" > "$WANXIANG_HASH_FILE"
 
           # 语言模型版本
           echo "### 语言模型" >> release_notes.md
