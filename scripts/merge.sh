@@ -18,10 +18,8 @@ mkdir -p "$OUTPUT_DIR"
 
 # 1. 复制雾凇拼音核心文件
 echo "[1/5] 复制雾凇拼音核心文件..."
-# 只复制需要的 schema 文件（全拼、英文、部首拼音）
-for schema in rime_ice.schema.yaml melt_eng.schema.yaml radical_pinyin.schema.yaml; do
-    cp "$UPSTREAM_DIR/$schema" "$OUTPUT_DIR/" 2>/dev/null || true
-done
+# 复制全部输入方案（全拼、七种双拼、英文、部首拆字、九键 T9）
+cp "$UPSTREAM_DIR"/*.schema.yaml "$OUTPUT_DIR/"
 # 复制其他配置文件
 cp "$UPSTREAM_DIR/default.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
 cp "$UPSTREAM_DIR/rime_ice.dict.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
@@ -36,11 +34,8 @@ cp "$UPSTREAM_DIR/LICENSE" "$OUTPUT_DIR/"
 
 # 复制子目录
 cp -r "$UPSTREAM_DIR/cn_dicts" "$OUTPUT_DIR/"
-# 只复制全拼需要的英文词典，跳过双拼专用的 cn_en_*.txt
-mkdir -p "$OUTPUT_DIR/en_dicts"
-cp "$UPSTREAM_DIR/en_dicts/cn_en.txt" "$OUTPUT_DIR/en_dicts/"
-cp "$UPSTREAM_DIR/en_dicts/en.dict.yaml" "$OUTPUT_DIR/en_dicts/"
-cp "$UPSTREAM_DIR/en_dicts/en_ext.dict.yaml" "$OUTPUT_DIR/en_dicts/"
+# 复制全部英文词典，含各双拼方案专用的 en_dicts/cn_en_*.txt
+cp -r "$UPSTREAM_DIR/en_dicts" "$OUTPUT_DIR/"
 cp -r "$UPSTREAM_DIR/opencc" "$OUTPUT_DIR/"
 cp -r "$UPSTREAM_DIR/lua" "$OUTPUT_DIR/"
 

@@ -1,3 +1,11 @@
 patch:
   schema_list:
     - schema: rime_ice               # 雾凇拼音（全拼）
+    # - schema: t9                   # 中文九键（仓输入法 & 元书输入法，移动端按需启用）
+    - schema: double_pinyin          # 自然码双拼
+    - schema: double_pinyin_abc      # 智能 ABC 双拼
+    - schema: double_pinyin_mspy     # 微软双拼
+    - schema: double_pinyin_sogou    # 搜狗双拼
+    - schema: double_pinyin_flypy    # 小鹤双拼
+    - schema: double_pinyin_ziguang  # 紫光双拼
+    - schema: double_pinyin_jiajia   # 拼音加加双拼

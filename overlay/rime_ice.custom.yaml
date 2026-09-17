@@ -10,8 +10,6 @@ patch:
   "translator/max_homophones": 7
   "translator/max_homographs": 7
   "translator/dictionary": rime_ice.custom # 挂载词库 rime_ice.custom.dict.yaml
-  schema_list:
-    - schema: rime_ice # 雾凇拼音（全拼）
   "reduce_english_filter/mode": all # all | custom | none
   "radical_reverse_lookup/dictionary": zdict
   ascii_composer:
