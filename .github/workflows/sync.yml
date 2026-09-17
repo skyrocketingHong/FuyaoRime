@@ -14,14 +14,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout this repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set date
         id: date
-        run: echo "DATE=$(date +%Y%m%d)" >> $GITHUB_ENV
+        # 用东八区日期，与每日北京时间 05:00 的定时触发保持一致
+        run: echo "DATE=$(TZ=Asia/Shanghai date +%Y%m%d)" >> $GITHUB_ENV
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.x'
 
@@ -132,7 +133,7 @@ jobs:
           echo "3. 重新部署" >> release_notes.md
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
         with:
           tag_name: v${{ env.DATE }}
