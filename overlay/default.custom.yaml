@@ -9,3 +9,9 @@ patch:
     - schema: double_pinyin_flypy    # 小鹤双拼
     - schema: double_pinyin_ziguang  # 紫光双拼
     - schema: double_pinyin_jiajia   # 拼音加加双拼
+  # 关闭「数字后半角标点」：清空数字分隔符后，数字后的逗号、句号、冒号恢复全角映射，
+  # 不再把 3.14、1,000 之类的输入当作数字分隔符整体上屏
+  "punctuator/digit_separators": ""
+  # 关闭「字母后半角标点」：替换掉 default 预设的通配模式（www.、https:、abc_、name@site 等），
+  # 各方案自有模式（v 符号、uU 拆字、R 金额大写、cC 计算器、N 农历）定义在方案文件中，不受影响
+  "recognizer/patterns": {}

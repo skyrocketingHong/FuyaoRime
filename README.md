@@ -151,6 +151,10 @@ FuyaoRime/
 
 全拼方案编辑 `overlay/rime_ice.custom.yaml`；其他方案按相同写法新增 `overlay/<schema_id>.custom.yaml`。
 
+### 标点行为
+
+已关闭「数字、字母后标点自动半角」，标点一律按全角映射处理：数字后的逗号、句号、冒号不再作为数字分隔符（`3.14`、`1,000` 不会整体上屏）；`www.`、`https:` 等前缀与 `abc_`、`name@site` 等写法中的标点也不再保持半角。输入网址、邮箱或代码标识符时，可按 Shift 临时切换英文模式。相关补丁位于 `overlay/default.custom.yaml`（`punctuator/digit_separators` 与 `recognizer/patterns`）。
+
 ## 致谢
 
 - [iDvel/rime-ice](https://github.com/iDvel/rime-ice)：雾凇拼音
