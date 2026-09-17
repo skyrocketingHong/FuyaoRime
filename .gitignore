@@ -23,6 +23,7 @@ Desktop.ini
 # 运行时目录
 upstream/
 output/
+custom_dicts/
 
 # 构建产物
 *.zip
@@ -42,3 +43,4 @@ build/
 *.tmp
 *.bak
 *.log
+AGENTS.md

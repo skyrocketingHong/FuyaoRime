@@ -30,6 +30,19 @@ import_tables:
 
   # https://pinyin.sogou.com/dict/detail/index/4
   - custom_dicts/popular_new_words
+
+  # 中文人名词库（姓氏＋名字），由 scripts/gen_chinese_names.py 生成
+  # https://github.com/wainshine/Chinese-Names-Corpus
+  - custom_dicts/chinese_names
+
+  # https://pinyin.sogou.com/dict/detail/index/15097
+  - custom_dicts/chengyu_suyu
+
+  # https://pinyin.sogou.com/dict/detail/index/2
+  - custom_dicts/gushi_mingju
+
+  # https://pinyin.sogou.com/dict/detail/index/1
+  - custom_dicts/tangshi_300
 ...
 
 

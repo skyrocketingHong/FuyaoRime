@@ -65,6 +65,10 @@ FuyaoRime 是一个自动更新的 Rime 输入法配置仓库。它从上游 [�
   - 网络俚语（`web-slang`）
   - 中国地名（`cn_places`）
   - 流行新词（`popular_new_words`）
+  - 中文人名（`chinese_names`，姓氏与名字，由语料自动生成）
+  - 成语俗语（`chengyu_suyu`）
+  - 古诗词名句（`gushi_mingju`）
+  - 唐诗三百首（`tangshi_300`）
 
 ## 使用方法
 
@@ -162,8 +166,10 @@ FuyaoRime/
 - [amzxyz/RIME-LMDG](https://github.com/amzxyz/RIME-LMDG)：万象拼音语言模型发布仓库
 - [felixonmars/fcitx5-pinyin-zhwiki](https://github.com/felixonmars/fcitx5-pinyin-zhwiki)：维基百科、维基文库、维基词典、网络俚语词库
 - [outloudvi/mw2fcitx](https://github.com/outloudvi/mw2fcitx)：萌娘百科词库
-- [搜狗词库](https://pinyin.sogou.com)：中国地名、流行新词词库
+- [搜狗词库](https://pinyin.sogou.com)：中国地名、流行新词、成语俗语、古诗词名句、唐诗三百首词库
 - [studyzy/imewlconverter](https://github.com/studyzy/imewlconverter)：深蓝词库转换工具
+- [wainshine/Chinese-Names-Corpus](https://github.com/wainshine/Chinese-Names-Corpus)：中文人名语料库
+- [pypinyin](https://github.com/mozillazg/pypinyin)：人名词库拼音标注
 
 ## 许可
 

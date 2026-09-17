@@ -38,7 +38,10 @@ GITHUB_DICTS = [
 
 SOGOU_DICTS = {
     "cn_places": 170672,
-    "popular_new_words": 4
+    "popular_new_words": 4,
+    "chengyu_suyu": 15097,   # 成语俗语【官方推荐】
+    "gushi_mingju": 2,       # 古诗词名句【官方推荐】
+    "tangshi_300": 1,        # 唐诗300首【官方推荐】
 }
 
 _github_token = None
@@ -248,6 +251,15 @@ def main():
     os.makedirs(target_dir, exist_ok=True)
 
     with tempfile.TemporaryDirectory() as temp_dir:
+        # 0. 生成人名词库（失败则中止，避免发布缺失词库的配置包）
+        try:
+            from gen_chinese_names import generate as generate_names
+        except ImportError as e:
+            print(f"无法导入人名词库生成器: {e}")
+            sys.exit(1)
+        if not generate_names():
+            sys.exit(1)
+
         # 1. 下载 GitHub 词库
         for repo_info in GITHUB_DICTS:
             repo = repo_info['repo']

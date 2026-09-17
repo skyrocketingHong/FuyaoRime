@@ -42,6 +42,7 @@ jobs:
 
       - name: Download extra dictionaries
         run: |
+          pip3 install pypinyin
           python3 scripts/update_dicts.py
 
       - name: Merge files
@@ -96,7 +97,7 @@ jobs:
           echo "" >> release_notes.md
 
           # 检查各个自定义词库是否有更新
-          CUSTOM_DICTS=("zhwiki" "web-slang" "zhwikisource" "zhwiktionary" "moegirl" "cn_places" "popular_new_words")
+          CUSTOM_DICTS=("zhwiki" "web-slang" "zhwikisource" "zhwiktionary" "moegirl" "cn_places" "popular_new_words" "chinese_names" "chengyu_suyu" "gushi_mingju" "tangshi_300")
           for dict_name in "${CUSTOM_DICTS[@]}"; do
             dict_file="custom_dicts/${dict_name}.dict.yaml"
             if [ -f "$dict_file" ]; then
