@@ -174,3 +174,9 @@ FuyaoRime/
 ## 许可
 
 本仓库再分发 [雾凇拼音](https://github.com/iDvel/rime-ice) 的配置与词库，整体遵循 [GPL-3.0](LICENSE) 许可证，与上游一致。
+
+## AI 辅助开发
+
+本项目在开发过程中使用生成式 AI 协助编码。
+
+[![Vibe PR](https://raw.githubusercontent.com/fenxer/llm-things/main/stickers/vibe-pr.svg)](https://github.com/fenxer/llm-things/blob/main/stickers/vibe-pr.svg)
