@@ -33,7 +33,10 @@ SURNAME_PINYIN_OVERRIDES = {
     "澹台": "tan tai", "单于": "xian yu",
 }
 
-NAME_WEIGHT = 100
+# 人名权重 1：与 tencent/zhwiki 等长尾词库一致，仅靠语料词频排序常用词，人名不抢位；
+# 姓氏仍用语料词频（多数与 8105 字表重复不生效，多音字姓氏需要排序优势）
+NAME_WEIGHT = 1
+RULES_VERSION = 2  # 生成规则变化时递增（1: 人名权重 100；2: 人名权重 1），语料未变也强制重新生成
 CJK_RE = re.compile(r"^[\u4e00-\u9fff]+$")
 
 
@@ -108,12 +111,13 @@ def generate():
             return False
 
         version = corpus_version(names_path) or "0"
-        # 语料版本未变时跳过重新生成，保持输出稳定
+        dict_version = f"{version}.r{RULES_VERSION}"
+        # 语料版本与生成规则均未变时跳过重新生成，保持输出稳定
         if os.path.exists(dest):
             with open(dest, encoding="utf-8") as f:
                 m = re.search(r'version:\s*"([^"]+)"', f.read(512))
-            if m and m.group(1) == version:
-                print(f"人名词库已是最新版本 ({version})，跳过更新。")
+            if m and m.group(1) == dict_version:
+                print(f"人名词库已是最新版本 ({dict_version})，跳过更新。")
                 return True
         lines = []
         # 姓氏：使用语料自带词频
@@ -143,7 +147,7 @@ def generate():
             "# 生成：scripts/gen_chinese_names.py，拼音由 pypinyin 标注，姓氏多音字人工校正\n"
             "---\n"
             f"name: chinese_names\n"
-            f'version: "{version}"\n'
+            f'version: "{version}.r{RULES_VERSION}"\n'
             "sort: by_weight\n"
             "...\n"
         )
@@ -153,7 +157,7 @@ def generate():
             f.write("\n")
 
         print(f"成功生成人名词库: chinese_names "
-              f"(姓氏 {surname_count}，名字 {len(lines) - surname_count}，跳过 {skipped}，版本 {version})")
+              f"(姓氏 {surname_count}，名字 {len(lines) - surname_count}，跳过 {skipped}，版本 {dict_version})")
         return True
 
 
