@@ -1,0 +1,14 @@
+# melt_eng 方案补丁：全小写派生放宽到三字母
+#
+# 上游 melt_eng.schema.yaml 的 algebra_common 仅对四个字母以上的编码
+# 派生全小写拼写（derive/^.{4,}$/\L$0/，用于规避低版本 Rime 的简拼重
+# 码），导致 iOS、NBA、IBM、CPU 等三字母词条输入小写时无法匹配，只剩
+# cn_en 词库「iOS版」等前缀候选。此处向 speller/algebra 追加三字母的
+# 全小写派生补齐，与四字母以上行为一致。
+#
+# 该补丁作用于英文方案本身，全拼与各双拼方案共用（英文词条不涉及双拼
+# 拼写差异，行为一致无副作用）。
+
+patch:
+  "speller/algebra/+":
+    - derive/^.{3}$/\L$0/

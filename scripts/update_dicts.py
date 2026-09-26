@@ -149,14 +149,17 @@ def get_sogou_dict_update_date(dict_id):
 
 
 def cleanup_dict_file(filepath):
+    """清理上游词库的无效词目：「--」「——」占位行与以连字符开头的词目
+
+    （如 zhwiki 的 -D、-i，系维基词缀类条目，无输入价值）"""
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             lines = f.readlines()
         with open(filepath, 'w', encoding='utf-8') as f:
             for line in lines:
-                if line.startswith('——\t') and line.strip() == '——':
+                if line.strip() in ('——', '--'):
                     continue
-                if line.startswith('--\t') and line.strip() == '--':
+                if line.startswith('-') and '\t' in line:
                     continue
                 f.write(line)
     except Exception as e:

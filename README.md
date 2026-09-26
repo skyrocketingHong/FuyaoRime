@@ -57,7 +57,8 @@ FuyaoRime 是一个自动更新的 Rime 输入法配置仓库。它从上游 [�
 ### 自定义内容
 
 - macOS 与 Windows 皮肤（薄荷绿、柑橘黄，均含明暗两套）
-- 额外词库（中文维基百科、维基文库、维基词典每日取 [felixonmars/fcitx5-pinyin-zhwiki](https://github.com/felixonmars/fcitx5-pinyin-zhwiki) 最新版，每周一另从 [维基媒体 dump](https://dumps.wikimedia.org/) 自建以跟进上游尚未发布的批次）：
+- `overlay/melt_eng.custom.yaml`：英文方案的全小写拼写派生放宽到三字母，输 `ios` 可直接出 `iOS`（NBA、IBM、CPU 等三字母缩写同样受益；上游仅对四个字母以上词条派生全小写）
+- 额外词库（中文维基百科、维基文库、维基词典每日取 [felixonmars/fcitx5-pinyin-zhwiki](https://github.com/felixonmars/fcitx5-pinyin-zhwiki) 最新版，每周一另从 [维基媒体 dump](https://dumps.wikimedia.org/) 自建以跟进上游尚未发布的批次；自建版过滤判决书等司法文书标题与连字符开头词条）：
   - 中文维基百科（`zhwiki`）
   - 维基文库（`zhwikisource`）
   - 维基词典（`zhwiktionary`）
@@ -120,6 +121,7 @@ FuyaoRime/
 ├── custom_dicts/                 # 额外词库，由 update_dicts.py 生成与更新
 ├── overlay/                      # 自定义配置，合并时叠加到上游文件
 │   ├── default.custom.yaml       # 方案列表
+│   ├── melt_eng.custom.yaml      # 英文方案补丁（三字母全小写派生）
 │   ├── rime_ice.custom.yaml      # 全拼方案定制（语言模型、模糊音等）
 │   ├── rime_ice.custom.dict.yaml # 自定义词库挂载
 │   ├── squirrel.custom.yaml      # macOS 皮肤

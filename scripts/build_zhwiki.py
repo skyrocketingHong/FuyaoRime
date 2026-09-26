@@ -43,10 +43,22 @@ DUMP_PROJECTS = ['zhwiki', 'zhwiktionary', 'zhwikisource']
 DUMPS_INDEX_URL = 'https://dumps.wikimedia.org/{}/'
 TITLES_GZ_URL = 'https://dumps.wikimedia.org/{project}/{date}/{project}-{date}-all-titles-in-ns0.gz'
 
+# 生成规则版本：变更过滤规则时递增，与 scripts/.zhwiki_build_rules 中
+# 记录的版本不一致即强制重建（词库版本号仍是 dump 日期，无法体现规则
+# 变化）
+# 1: 上游 convert.py 原样移植
+# 2: 过滤判决书等司法文书标题与「-」开头的词目
+BUILD_RULES_VERSION = 2
+RULES_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.zhwiki_build_rules')
+
 # ===== 以下转换逻辑移植自上游 convert.py，保持规则一致 =====
 
 _MINIMUM_LEN = 2
 _LIST_PAGE_ENDINGS = ['列表', '对照表']
+
+# 维基文库 2026 年批量导入裁判文书（占 ns0 标题约八成），此类标题对
+# 输入法无价值；zhwiki/zhwiktionary 偶有同名条目一并过滤
+_JUDICIAL_DOC_RE = regex.compile(r'判决书|裁定书|决定书|起诉书|裁决书|调解书|上诉状')
 
 _PINYIN_SEPARATOR = "'"
 # https://ayaka.shn.hk/hanregex/
@@ -130,6 +142,8 @@ def is_good_title(title, previous_title=None):
     if len(title) < _MINIMUM_LEN:
         return False
     if title.endswith(tuple(_LIST_PAGE_ENDINGS)):
+        return False
+    if _JUDICIAL_DOC_RE.search(title):
         return False
     if previous_title and \
       len(previous_title) >= 4 and \
@@ -243,9 +257,10 @@ def build_project(project, dest_file, force=False):
         entries = set()
         count = 0
         for word, pinyin in convert_titles(titles_path):
-            # 纯连字符类标题（如「--」）会得到空拼音，上游成品同样存在、
+            # 纯连字符类标题（如「--」）会得到空拼音；「-D」「-i」等词缀
+            # 条目以连字符开头，均无输入价值。上游成品同样存在这些行、
             # 由下载路径的 cleanup_dict_file 清理，这里直接过滤保持一致
-            if not pinyin:
+            if not pinyin or word.startswith('-'):
                 continue
             entries.add(f'{word}\t{pinyin}\n')
             count += 1
@@ -265,6 +280,19 @@ def build_project(project, dest_file, force=False):
         return True
 
 
+def rules_version_matches():
+    try:
+        with open(RULES_STATE_FILE, encoding='utf-8') as f:
+            return f.read().strip() == str(BUILD_RULES_VERSION)
+    except OSError:
+        return False
+
+
+def write_rules_version():
+    with open(RULES_STATE_FILE, 'w', encoding='utf-8') as f:
+        f.write(f'{BUILD_RULES_VERSION}\n')
+
+
 def main():
     parser = argparse.ArgumentParser(description='从维基媒体标题 dump 自建 zhwiki 系词库')
     parser.add_argument('--only', choices=DUMP_PROJECTS, action='append',
@@ -278,22 +306,26 @@ def main():
     target_dir = os.path.join(project_dir, 'custom_dicts')
     os.makedirs(target_dir, exist_ok=True)
 
+    # 过滤规则变更（BUILD_RULES_VERSION 递增）时强制重建一次
+    force = args.force or not rules_version_matches()
+
     projects = args.only or DUMP_PROJECTS
     failed = []
     for project in projects:
         try:
             if not build_project(project, os.path.join(target_dir, f'{project}.dict.yaml'),
-                                 force=args.force):
+                                 force=force):
                 failed.append(project)
         except Exception as e:
             # 单库失败保留现有词库（上游下载版本兜底），不中止整体
             print(f"[{project}] 构建失败，保留现有词库: {e}")
             failed.append(project)
 
-    if failed:
-        print(f"以下词库未更新: {', '.join(failed)}")
-    else:
+    if not failed:
+        write_rules_version()
         print('全部词库构建完成')
+    else:
+        print(f"以下词库未更新: {', '.join(failed)}")
     return 0
 
 
