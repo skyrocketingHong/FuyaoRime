@@ -104,6 +104,35 @@ def get_local_version(filepath):
     return None
 
 
+def is_date_version(version):
+    """是否为 YYYYMMDD 形式的纯日期版本号"""
+    return bool(version) and re.fullmatch(r'\d{8}', version) is not None
+
+
+def pick_latest_asset(assets, dict_name, pattern):
+    """在 release assets 中为 dict_name 挑选最新文件。
+
+    felixonmars/fcitx5-pinyin-zhwiki 不再为每批词库发新 release，而是把
+    「名称-YYYYMMDD.dict.yaml」持续追加到同一 release；API 返回的 assets
+    按上传时间升序排列，因此必须取文件名日期最大者，不能取第一个匹配项。
+    返回 (download_url, remote_version)；remote_version 仅对带日期命名的
+    asset 有值，无日期命名的（如 moegirl.dict.yaml）返回 None。
+    """
+    if '{}' in pattern:
+        name_re = re.compile(r'^{}-(\d{{8}})\.dict\.yaml$'.format(re.escape(dict_name)))
+        best_date, best_url = None, None
+        for asset in assets:
+            match = name_re.match(asset['name'])
+            if match and (best_date is None or match.group(1) > best_date):
+                best_date, best_url = match.group(1), asset['browser_download_url']
+        return best_url, best_date
+    exact_name = '{}.dict.yaml'.format(dict_name)
+    for asset in assets:
+        if asset['name'] == exact_name:
+            return asset['browser_download_url'], None
+    return None, None
+
+
 def get_sogou_dict_update_date(dict_id):
     """从搜狗词库详情页获取更新日期"""
     url = f"https://pinyin.sogou.com/dict/detail/index/{dict_id}"
@@ -271,31 +300,26 @@ def main():
             tag_name = release_info.get('tag_name', '').replace('v', '')
             for dict_name, pattern in repo_info['files'].items():
                 dest_file = os.path.join(target_dir, f"{dict_name}.dict.yaml")
-                expected_filename = pattern.format(tag_name.replace('-', ''))
-                if '{}' not in pattern:
-                    expected_filename = pattern
-                download_url = None
-                remote_version = tag_name.replace('-', '')
-                for asset in assets:
-                    if asset['name'] == expected_filename or (dict_name in asset['name'] and asset['name'].endswith('.dict.yaml')):
-                        download_url = asset['browser_download_url']
-                        date_match = re.search(r'-(\d{8})', asset['name'])
-                        if date_match:
-                            remote_version = date_match.group(1)
-                        break
+                download_url, remote_version = pick_latest_asset(assets, dict_name, pattern)
+                if not download_url:
+                    print(f"在 release 中未找到匹配的词库文件: {dict_name}")
+                    continue
                 if not remote_version:
-                    remote_version = datetime.date.today().strftime('%Y%m%d')
+                    remote_version = tag_name.replace('-', '') or datetime.date.today().strftime('%Y%m%d')
                 local_version = get_local_version(dest_file)
                 if local_version == remote_version:
                     print(f"词库 {dict_name} 已是最新版本 ({local_version})，跳过更新。")
                     continue
-                if download_url:
-                    if download_file(download_url, dest_file):
-                        cleanup_dict_file(dest_file)
-                        patch_dict_metadata(dest_file, dict_name, remote_version)
-                        print(f"成功更新词库: {dict_name} (版本更新至 {remote_version})")
-                else:
-                    print(f"在 release 中未找到匹配的词库文件: {dict_name}")
+                # 本地版本新于远端时跳过：每周自建的词库（build_zhwiki.py）
+                # 可能领先上游 release，不能被旧 asset 覆盖
+                if is_date_version(local_version) and is_date_version(remote_version) \
+                        and local_version > remote_version:
+                    print(f"词库 {dict_name} 本地版本 ({local_version}) 新于远端 ({remote_version})，跳过更新。")
+                    continue
+                if download_file(download_url, dest_file):
+                    cleanup_dict_file(dest_file)
+                    patch_dict_metadata(dest_file, dict_name, remote_version)
+                    print(f"成功更新词库: {dict_name} (版本更新至 {remote_version})")
 
         # 2. 下载和转换搜狗词库
         imewl_cmd = None

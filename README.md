@@ -57,7 +57,7 @@ FuyaoRime 是一个自动更新的 Rime 输入法配置仓库。它从上游 [�
 ### 自定义内容
 
 - macOS 与 Windows 皮肤（薄荷绿、柑橘黄，均含明暗两套）
-- 额外词库：
+- 额外词库（中文维基百科、维基文库、维基词典每日取 [felixonmars/fcitx5-pinyin-zhwiki](https://github.com/felixonmars/fcitx5-pinyin-zhwiki) 最新版，每周一另从 [维基媒体 dump](https://dumps.wikimedia.org/) 自建以跟进上游尚未发布的批次）：
   - 中文维基百科（`zhwiki`）
   - 维基文库（`zhwikisource`）
   - 维基词典（`zhwiktionary`）
@@ -75,7 +75,9 @@ FuyaoRime 是一个自动更新的 Rime 输入法配置仓库。它从上游 [�
 ### 方法一：下载 Release 包（推荐）
 
 1. 前往 [Releases](https://github.com/skyrocketingHong/FuyaoRime/releases) 页面；
-2. 下载最新的 `fuyaorime-*.zip`；
+2. 下载最新的 `fuyaorime-*.zip`：
+   - `fuyaorime-YYYYMMDD.zip` 为全量包，首次使用或间隔多版时下载；
+   - `fuyaorime-YYYYMMDD-diff-from-YYYYMMDD.zip` 为相对上一版的增量包，已安装紧邻上一版的用户可下载，解压覆盖即可（变更与删除清单见包内 `INCREMENTAL-README.txt`）；
 3. 解压全部内容到 Rime 配置目录：
    - macOS：`~/Library/Rime/`
    - Windows：`%APPDATA%\Rime\`
@@ -100,6 +102,9 @@ curl -L -o upstream/wanxiang/wanxiang-lts-zh-hans.gram \
 # 更新额外词库
 python3 scripts/update_dicts.py
 
+# （可选）从维基媒体 dump 自建 zhwiki 系词库，依赖 opencc、regex、more-itertools
+python3 scripts/build_zhwiki.py
+
 # 合并配置
 bash scripts/merge.sh
 
@@ -120,6 +125,8 @@ FuyaoRime/
 │   ├── squirrel.custom.yaml      # macOS 皮肤
 │   └── weasel.custom.yaml        # Windows 皮肤
 ├── scripts/
+│   ├── build_zhwiki.py           # 从维基媒体 dump 自建 zhwiki 系词库
+│   ├── make_diff_package.py      # 生成相对上一版的增量更新包
 │   ├── merge.sh                  # 合并脚本
 │   ├── update_dicts.py           # 额外词库更新脚本
 │   └── .rime_ice_hash            # 上游 commit 记录
@@ -134,9 +141,10 @@ FuyaoRime/
 
 1. 拉取雾凇拼音最新版本；
 2. 下载万象拼音语言模型；
-3. 更新额外词库；
-4. 合并所有文件，保留全部输入方案与自定义配置；
-5. 发布 `fuyaorime-*.zip` 到 Releases。
+3. 更新额外词库（维基系词库取上游 release 中日期最新的文件）；
+4. 每周一（北京时间）从维基媒体 dump 自建 zhwiki 系词库（dump 约每月一批，脚本按日期去重，不会重复构建）；
+5. 合并所有文件，保留全部输入方案与自定义配置；
+6. 生成全量包 `fuyaorime-*.zip` 与相对上一版的增量包 `*-diff-from-*.zip`，发布到 Releases。
 
 也可以在 [Actions](https://github.com/skyrocketingHong/FuyaoRime/actions/workflows/sync.yml) 页面手动触发。
 
@@ -165,6 +173,7 @@ FuyaoRime/
 - [amzxyz/rime_wanxiang](https://github.com/amzxyz/rime_wanxiang)：万象拼音
 - [amzxyz/RIME-LMDG](https://github.com/amzxyz/RIME-LMDG)：万象拼音语言模型发布仓库
 - [felixonmars/fcitx5-pinyin-zhwiki](https://github.com/felixonmars/fcitx5-pinyin-zhwiki)：维基百科、维基文库、维基词典、网络俚语词库
+- [Wikimedia Dumps](https://dumps.wikimedia.org/)：维基媒体条目标题 dump（zhwiki 系词库每周自建的数据源）
 - [outloudvi/mw2fcitx](https://github.com/outloudvi/mw2fcitx)：萌娘百科词库
 - [搜狗词库](https://pinyin.sogou.com)：中国地名、流行新词、成语俗语、古诗词名句、唐诗三百首词库
 - [studyzy/imewlconverter](https://github.com/studyzy/imewlconverter)：深蓝词库转换工具

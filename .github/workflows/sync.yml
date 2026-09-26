@@ -43,8 +43,18 @@ jobs:
 
       - name: Download extra dictionaries
         run: |
-          pip3 install pypinyin
+          pip3 install pypinyin opencc regex more-itertools
           python3 scripts/update_dicts.py
+
+      - name: Build zhwiki dictionaries from dumps (weekly)
+        # 维基 dump 约每月一批，每周一（北京时间）检查并跟进最新一批；
+        # 脚本内部按 dump 日期去重，同一批不会重复构建
+        run: |
+          if [ "$(TZ=Asia/Shanghai date +%u)" = "1" ]; then
+            python3 scripts/build_zhwiki.py
+          else
+            echo "今天不是周一（北京时间），跳过 dump 自建"
+          fi
 
       - name: Merge files
         run: |
@@ -55,6 +65,28 @@ jobs:
         run: |
           cd output
           zip -r ../fuyaorime-${{ env.DATE }}.zip .
+
+      - name: Create incremental diff package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PREV_TAG=$(gh api "repos/${{ github.repository }}/releases?per_page=2" \
+            --jq '.[1].tag_name // empty')
+          if [ -z "$PREV_TAG" ]; then
+            echo "无历史 release，跳过增量包"
+            exit 0
+          fi
+          PREV_DATE="${PREV_TAG#v}"
+          mkdir -p prev_release
+          if ! gh release download "$PREV_TAG" -R "${{ github.repository }}" \
+              -p "fuyaorime-${PREV_DATE}.zip" -D prev_release; then
+            echo "下载上一版全量包失败，跳过增量包"
+            exit 0
+          fi
+          python3 scripts/make_diff_package.py output \
+            "prev_release/fuyaorime-${PREV_DATE}.zip" \
+            "fuyaorime-${{ env.DATE }}-diff-from-${PREV_DATE}.zip" \
+            "$PREV_DATE" "${{ env.DATE }}"
 
       - name: Generate release notes
         run: |
@@ -117,6 +149,15 @@ jobs:
             echo "" >> release_notes.md
           fi
 
+          # 增量包说明
+          DIFF_ZIP=$(ls fuyaorime-${{ env.DATE }}-diff-from-*.zip 2>/dev/null | head -1)
+          if [ -n "$DIFF_ZIP" ]; then
+            echo "## 增量更新包" >> release_notes.md
+            echo "" >> release_notes.md
+            echo "- \`${DIFF_ZIP}\`：相对上一版的增量包，已安装上一版的用户下载后解压覆盖到 Rime 配置目录并重新部署即可，详见包内 INCREMENTAL-README.txt" >> release_notes.md
+            echo "" >> release_notes.md
+          fi
+
           # 包含内容说明
           echo "## 包含内容" >> release_notes.md
           echo "- 雾凇拼音全部输入方案（全拼、七种双拼、九键 T9 等）" >> release_notes.md
@@ -139,7 +180,7 @@ jobs:
           tag_name: v${{ env.DATE }}
           name: FuyaoRime ${{ env.DATE }}
           body_path: release_notes.md
-          files: fuyaorime-${{ env.DATE }}.zip
+          files: fuyaorime-*.zip
           draft: false
           prerelease: false
         env:

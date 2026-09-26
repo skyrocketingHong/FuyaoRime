@@ -44,3 +44,7 @@ build/
 *.bak
 *.log
 AGENTS.md
+
+# 虚拟环境
+.venv/
+venv/
