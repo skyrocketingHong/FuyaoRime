@@ -184,6 +184,19 @@ def convert_titles(titles_path):
 
 HTTP_TIMEOUT = 60  # 秒，连接与每次读取的超时
 
+# 标题 dump 的本地缓存目录（可用环境变量 FUYAO_TITLES_CACHE 覆盖）：
+# dumps.wikimedia.org 连接不稳定时，可用 curl 等工具断点续传下载到此处，
+# 脚本检测到同名文件即跳过下载
+CACHE_DIR = os.environ.get(
+    'FUYAO_TITLES_CACHE', os.path.expanduser('~/Library/Caches/fuyaorime'))
+
+
+def find_cached_titles(project, dump_date):
+    cache_path = os.path.join(CACHE_DIR, f'{project}-{dump_date}-all-titles-in-ns0.gz')
+    if os.path.exists(cache_path) and os.path.getsize(cache_path) > 0:
+        return cache_path
+    return None
+
 
 def http_get(url):
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
@@ -237,19 +250,24 @@ def build_project(project, dest_file, force=False):
     with tempfile.TemporaryDirectory() as tmp_dir:
         gz_path = os.path.join(tmp_dir, 'titles.gz')
         titles_path = os.path.join(tmp_dir, 'titles')
-        print(f"[{project}] 正在下载: {gz_url}")
-        last_err = None
-        for attempt in range(3):
-            try:
-                with http_get(gz_url) as resp, open(gz_path, 'wb') as f:
-                    f.write(resp.read())
-                last_err = None
-                break
-            except Exception as e:
-                last_err = e
-                print(f"[{project}] 下载失败（第 {attempt + 1} 次）: {e}")
-        if last_err is not None:
-            raise RuntimeError(f'下载标题 dump 失败: {last_err}')
+        cached = find_cached_titles(project, dump_date)
+        if cached:
+            print(f"[{project}] 使用本地缓存: {cached}")
+            gz_path = cached
+        else:
+            print(f"[{project}] 正在下载: {gz_url}")
+            last_err = None
+            for attempt in range(3):
+                try:
+                    with http_get(gz_url) as resp, open(gz_path, 'wb') as f:
+                        f.write(resp.read())
+                    last_err = None
+                    break
+                except Exception as e:
+                    last_err = e
+                    print(f"[{project}] 下载失败（第 {attempt + 1} 次）: {e}")
+            if last_err is not None:
+                raise RuntimeError(f'下载标题 dump 失败: {last_err}')
         with gzip.open(gz_path, 'rb') as gz_in, open(titles_path, 'wb') as f_out:
             f_out.write(gz_in.read())
 
