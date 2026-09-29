@@ -20,7 +20,7 @@ Desktop.ini
 *.swo
 *~
 
-# 运行时目录
+# 运行时目录（custom_dicts 不入库，CI 从上一版 release 全量包恢复）
 upstream/
 output/
 custom_dicts/

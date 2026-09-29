@@ -21,6 +21,30 @@ jobs:
         # 用东八区日期，与每日北京时间 05:00 的定时触发保持一致
         run: echo "DATE=$(TZ=Asia/Shanghai date +%Y%m%d)" >> $GITHUB_ENV
 
+      - name: Download previous release package
+        # 取「最新已发布且非当天 tag」的 release 全量包，一次下载两用：
+        # 恢复 custom_dicts 起点＋增量包对比基线。不能依赖 releases 列表
+        # 序号（草稿排在已发布之后，.[1] 会取到前天的包）
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PREV_TAG=$(gh api "repos/${{ github.repository }}/releases?per_page=10" \
+            --jq "[.[] | select(.draft == false and .tag_name != \"v${{ env.DATE }}\")] | .[0].tag_name // empty")
+          if [ -z "$PREV_TAG" ]; then
+            echo "无已发布的历史 release，custom_dicts 从零开始、跳过增量包"
+            exit 0
+          fi
+          PREV_DATE="${PREV_TAG#v}"
+          mkdir -p prev_release
+          if ! gh release download "$PREV_TAG" -R "${{ github.repository }}" \
+              -p "fuyaorime-${PREV_DATE}.zip" -D prev_release; then
+            echo "下载上一版全量包失败，custom_dicts 从零开始、跳过增量包"
+            exit 0
+          fi
+          echo "PREV_TAG=${PREV_TAG}" >> "$GITHUB_ENV"
+          echo "PREV_DATE=${PREV_DATE}" >> "$GITHUB_ENV"
+          echo "上一版全量包: ${PREV_TAG}"
+
       - name: Setup Python
         uses: actions/setup-python@v7
         with:
@@ -40,6 +64,18 @@ jobs:
             assets=[a for a in data['assets'] if a['name']=='wanxiang-lts-zh-hans.gram']; \
             print(assets[0]['updated_at'].split('T')[0].replace('-','') if assets else '')" \
             > upstream/wanxiang/version.txt
+
+      - name: Restore custom_dicts from previous package
+        # 词库不入库，状态存于 release 链：从上一版全量包恢复 custom_dicts
+        # 作为本次起点，周一自建与每日更新的成果经 release 延续到后续运
+        # 行，「本地版本新于远端则跳过」的保护因此跨运行生效
+        run: |
+          if [ -z "$PREV_TAG" ]; then
+            exit 0
+          fi
+          unzip -q "prev_release/fuyaorime-${PREV_DATE}.zip" 'custom_dicts/*' -d .
+          echo "已从 ${PREV_TAG} 恢复词库版本:"
+          grep -H '^version:' custom_dicts/*.dict.yaml
 
       - name: Download extra dictionaries
         run: |
@@ -67,20 +103,11 @@ jobs:
           zip -r ../fuyaorime-${{ env.DATE }}.zip .
 
       - name: Create incremental diff package
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # 基线 zip 已在任务开始时下载到 prev_release/（与 custom_dicts 恢
+        # 复共用同一次下载），此处直接对比
         run: |
-          PREV_TAG=$(gh api "repos/${{ github.repository }}/releases?per_page=2" \
-            --jq '.[1].tag_name // empty')
           if [ -z "$PREV_TAG" ]; then
             echo "无历史 release，跳过增量包"
-            exit 0
-          fi
-          PREV_DATE="${PREV_TAG#v}"
-          mkdir -p prev_release
-          if ! gh release download "$PREV_TAG" -R "${{ github.repository }}" \
-              -p "fuyaorime-${PREV_DATE}.zip" -D prev_release; then
-            echo "下载上一版全量包失败，跳过增量包"
             exit 0
           fi
           python3 scripts/make_diff_package.py output \
