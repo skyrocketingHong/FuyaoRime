@@ -58,7 +58,7 @@ FuyaoRime 是一个自动更新的 Rime 输入法配置仓库。它从上游 [�
 
 - macOS 与 Windows 皮肤（薄荷绿、柑橘黄，均含明暗两套）
 - `overlay/melt_eng.custom.yaml`：英文方案的全小写拼写派生放宽到三字母，输 `ios` 可直接出 `iOS`（NBA、IBM、CPU 等三字母缩写同样受益；上游仅对四个字母以上词条派生全小写）
-- 额外词库（中文维基百科、维基文库、维基词典每日取 [felixonmars/fcitx5-pinyin-zhwiki](https://github.com/felixonmars/fcitx5-pinyin-zhwiki) 最新版，每周一另从 [维基媒体 dump](https://dumps.wikimedia.org/) 自建以跟进上游尚未发布的批次；自建版过滤判决书等司法文书标题与连字符开头词条）：
+- 额外词库（中文维基百科、维基文库、维基词典每日取 [felixonmars/fcitx5-pinyin-zhwiki](https://github.com/felixonmars/fcitx5-pinyin-zhwiki) 最新版，每周另从 [维基媒体 dump](https://dumps.wikimedia.org/) 自建以跟进上游尚未发布的批次，周一漏建则本周内补建；自建版过滤判决书等司法文书标题与连字符开头词条）：
   - 中文维基百科（`zhwiki`）
   - 维基文库（`zhwikisource`）
   - 维基词典（`zhwiktionary`）
@@ -84,6 +84,69 @@ FuyaoRime 是一个自动更新的 Rime 输入法配置仓库。它从上游 [�
    - Windows：`%APPDATA%\Rime\`
    - Linux：`~/.config/rime/`
 4. 重新部署 Rime（鼠须管、小狼毫在输入法菜单中选择「重新部署」）。
+
+下载与覆盖可交给自动更新脚本完成，见下文[「自动增量更新」](#自动增量更新)。
+
+## 自动增量更新
+
+`updater/` 目录提供三种平台的客户端脚本，已安装 FuyaoRime 的机器每日自动下载增量包并重新部署：
+
+| 平台 | 客户端 | 脚本 | Rime 配置目录 |
+| :--- | :--- | :--- | :--- |
+| macOS | 鼠须管（Squirrel） | `fuyaorime-update-macos.sh` | `~/Library/Rime/` |
+| Windows | 小狼毫（Weasel） | `fuyaorime-update-windows.ps1` | `%APPDATA%\Rime\` |
+| Linux | ibus-rime / fcitx5-rime | `fuyaorime-update-linux.sh` | `~/.config/rime/` |
+
+脚本行为：
+
+1. 首次运行没有本地版本标记（配置目录下的 `fuyaorime-version.txt`），下载全量包安装；
+2. 之后每日运行只下载增量包，相隔多天时按发布链逐个应用；
+3. 增量链中断（某日增量包缺失，或本地版本早于最近一百个 release）时自动回退全量包，不跳版漏文件；
+4. 增量包 `INCREMENTAL-README.txt` 中的删除清单会被解析，对应文件自动清理；
+5. 更新完成后自动重新部署：鼠须管 `--reload`，小狼毫 `WeaselDeployer /deploy`，Linux 重启 ibus 或 fcitx5。
+
+### 安装与运行
+
+macOS（Linux 相同，换用对应脚本）：
+
+```bash
+curl -fsSL -o ~/bin/fuyaorime-update-macos.sh \
+  https://raw.githubusercontent.com/skyrocketingHong/FuyaoRime/main/updater/fuyaorime-update-macos.sh
+chmod +x ~/bin/fuyaorime-update-macos.sh
+~/bin/fuyaorime-update-macos.sh
+```
+
+Windows（PowerShell）：
+
+```powershell
+Invoke-WebRequest -UseBasicParsing `
+  -Uri https://raw.githubusercontent.com/skyrocketingHong/FuyaoRime/main/updater/fuyaorime-update-windows.ps1 `
+  -OutFile "$env:USERPROFILE\fuyaorime-update-windows.ps1"
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\fuyaorime-update-windows.ps1"
+```
+
+### 每日定时（示例为 06:30）
+
+macOS 与 Linux（`crontab -e`，日志路径按需调整）：
+
+```bash
+30 6 * * * /bin/bash ~/bin/fuyaorime-update-macos.sh >> ~/Library/Logs/fuyaorime-update.log 2>&1
+30 6 * * * /bin/bash ~/bin/fuyaorime-update-linux.sh >> ~/.local/share/fuyaorime-update.log 2>&1
+```
+
+Windows（任务计划程序）：
+
+```bat
+schtasks /Create /SC DAILY /ST 06:30 /TN "FuyaoRime Update" ^
+  /TR "powershell -ExecutionPolicy Bypass -File \"%USERPROFILE%\fuyaorime-update-windows.ps1\""
+```
+
+说明：
+
+- 依赖 `curl` 与 `unzip`，macOS 自带，Linux 缺失时用发行版包管理器安装；
+- 查询 release 列表走 GitHub 匿名 API（限额 60 次/小时），每日一次远低于限额；
+- Linux 定时任务没有图形会话时可能无法自动重启输入法，日志会给出提示，届时手动重新部署即可；
+- 脚本只覆盖配置包内的文件并清理删除清单，不触碰 `*.userdb` 等用户数据；需要彻底恢复时重新解压全量包即可。
 
 ### 方法二：手动同步
 
@@ -131,7 +194,13 @@ FuyaoRime/
 │   ├── make_diff_package.py      # 生成相对上一版的增量更新包
 │   ├── merge.sh                  # 合并脚本
 │   ├── update_dicts.py           # 额外词库更新脚本
-│   └── .rime_ice_hash            # 上游 commit 记录
+│   ├── .rime_ice_hash            # 上游 commit 记录
+│   ├── .zhwiki_build_rules       # zhwiki 构建规则版本
+│   └── .zhwiki_weekly_build      # zhwiki 每周构建记录
+├── updater/
+│   ├── fuyaorime-update-linux.sh     # Linux 客户端自动增量更新
+│   ├── fuyaorime-update-macos.sh     # macOS 客户端自动增量更新
+│   └── fuyaorime-update-windows.ps1  # Windows 客户端自动增量更新
 ├── AGENTS.md                     # 项目约定
 ├── LICENSE                       # GPL-3.0 许可证
 └── README.md
@@ -144,7 +213,7 @@ FuyaoRime/
 1. 拉取雾凇拼音最新版本；
 2. 下载万象拼音语言模型；
 3. 更新额外词库（维基系词库取上游 release 中日期最新的文件）；
-4. 每周一（北京时间）从维基媒体 dump 自建 zhwiki 系词库（dump 约每月一批，脚本按日期去重，不会重复构建）；
+4. 每周从维基媒体 dump 自建 zhwiki 系词库（周一运行，周一漏建则本周内首个运行补建；dump 约每月一批，脚本按日期去重，不会重复构建）；
 5. 合并所有文件，保留全部输入方案与自定义配置；
 6. 生成全量包 `fuyaorime-*.zip` 与相对上一版的增量包 `*-diff-from-*.zip`，发布到 Releases。
 
