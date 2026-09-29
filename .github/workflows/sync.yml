@@ -22,9 +22,8 @@ jobs:
         run: echo "DATE=$(TZ=Asia/Shanghai date +%Y%m%d)" >> $GITHUB_ENV
 
       - name: Download previous release package
-        # 取「最新已发布且非当天 tag」的 release 全量包，一次下载两用：
-        # 恢复 custom_dicts 起点＋增量包对比基线。不能依赖 releases 列表
-        # 序号（草稿排在已发布之后，.[1] 会取到前天的包）
+        # 最新已发布且非当天 tag 的全量包：恢复 custom_dicts 起点＋增量
+        # 包基线；不能取列表序号（草稿排在已发布之后，.[1] 会取到前天）
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -66,9 +65,8 @@ jobs:
             > upstream/wanxiang/version.txt
 
       - name: Restore custom_dicts from previous package
-        # 词库不入库，状态存于 release 链：从上一版全量包恢复 custom_dicts
-        # 作为本次起点，周一自建与每日更新的成果经 release 延续到后续运
-        # 行，「本地版本新于远端则跳过」的保护因此跨运行生效
+        # 词库不入库：从上一版全量包恢复起点，「本地版本新于远端则跳过」
+        # 的保护才能跨运行生效
         run: |
           if [ -z "$PREV_TAG" ]; then
             exit 0
@@ -83,9 +81,8 @@ jobs:
           python3 scripts/update_dicts.py
 
       - name: Build zhwiki dictionaries from dumps (weekly)
-        # 维基 dump 约每月一批，每周构建一次；脚本内部按 ISO 周去重（一
-        # 周之首是周一，周日属上周）：周一运行即构建，周一未构建（失败
-        # 或未运行）则本周内首个运行补建，同一批 dump 另按版本门槛去重
+        # 脚本按 ISO 周去重（周一为一周之首）：周一构建，漏建则本周内补
+        # 建；dump 批次另按版本门槛去重
         run: python3 scripts/build_zhwiki.py
 
       - name: Merge files
@@ -99,8 +96,7 @@ jobs:
           zip -r ../fuyaorime-${{ env.DATE }}.zip .
 
       - name: Create incremental diff package
-        # 基线 zip 已在任务开始时下载到 prev_release/（与 custom_dicts 恢
-        # 复共用同一次下载），此处直接对比
+        # 基线 zip 已在 prev_release/，与 custom_dicts 恢复共用同一次下载
         run: |
           if [ -z "$PREV_TAG" ]; then
             echo "无历史 release，跳过增量包"

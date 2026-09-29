@@ -57,9 +57,8 @@ TITLES_GZ_URL = 'https://dumps.wikimedia.org/{project}/{date}/{project}-{date}-a
 BUILD_RULES_VERSION = 2
 RULES_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.zhwiki_build_rules')
 
-# 每周构建状态文件：记录最近一次成功构建所在 ISO 周的周一日期。注意一
-# 周之首是周一而非周日——date.weekday() 周一为 0、周日为 6，周日回退
-# 到的仍是同一个周一，属于上周，不会提前触发新一周的构建
+# 每周构建状态：记录最近一次成功构建所在 ISO 周的周一。weekday() 周一
+# 为 0、周日为 6，周日回退到的仍是同一个周一，属上周，不提前触发新一周
 WEEKLY_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.zhwiki_weekly_build')
 
 # 定时任务以北京时间为准判定周几，运行器系统时钟是 UTC
@@ -361,8 +360,8 @@ def main():
     # 过滤规则变更（BUILD_RULES_VERSION 递增）时强制重建一次
     force = args.force or not rules_version_matches()
 
-    # 每周一构建；非周一运行时若本周一尚未成功构建（如周一运行失败或
-    # 未运行）则补建。--force 与 --only 为人工指定，不受周门槛约束
+    # 周一构建；本周一未成功构建（失败或未运行）则非周一运行补建。
+    # --force 与 --only 为人工指定，不受周门槛约束
     monday = current_week_monday()
     if not force and not args.only and weekly_build_done(monday):
         print(f"本周（{monday.isoformat()} 起）已完成构建，跳过")
