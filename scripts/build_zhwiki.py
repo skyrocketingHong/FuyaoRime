@@ -13,11 +13,16 @@ custom_dicts/ 下对应词库的版本号时才下载并重建，同一批 dump 
 本可比：update_dicts.py 侧已有本地版本新于远端则跳过的保护，本脚本侧
 的版本门槛保证不会用旧 dump 覆盖新内容。
 
+构建节奏为每周一次，按 ISO 周去重：一周之首是周一（周日仍属上周），
+本周已成功构建则跳过；周一的运行失败或未发生时，本周内后续运行自动
+补建。状态文件 scripts/.zhwiki_weekly_build 记录最近一次成功构建所
+在周的周一日期，须入库以跨 CI 运行保留。
+
 依赖：opencc、pypinyin、regex、more-itertools（pip 安装）
 
 用法：
-    python3 scripts/build_zhwiki.py                # 构建全部三库
-    python3 scripts/build_zhwiki.py --only zhwiki  # 只构建 zhwiki
+    python3 scripts/build_zhwiki.py                # 构建全部三库（每周一次）
+    python3 scripts/build_zhwiki.py --only zhwiki  # 只构建 zhwiki（不记周状态）
     python3 scripts/build_zhwiki.py --force        # 忽略版本门槛强制重建
 
 单个词库构建失败只打印告警、保留现有词库（回退到上游下载版本），不中
@@ -25,6 +30,7 @@ custom_dicts/ 下对应词库的版本号时才下载并重建，同一批 dump 
 """
 
 import argparse
+import datetime
 import gzip
 import logging
 import os
@@ -50,6 +56,14 @@ TITLES_GZ_URL = 'https://dumps.wikimedia.org/{project}/{date}/{project}-{date}-a
 # 2: 过滤判决书等司法文书标题与「-」开头的词目
 BUILD_RULES_VERSION = 2
 RULES_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.zhwiki_build_rules')
+
+# 每周构建状态文件：记录最近一次成功构建所在 ISO 周的周一日期。注意一
+# 周之首是周一而非周日——date.weekday() 周一为 0、周日为 6，周日回退
+# 到的仍是同一个周一，属于上周，不会提前触发新一周的构建
+WEEKLY_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.zhwiki_weekly_build')
+
+# 定时任务以北京时间为准判定周几，运行器系统时钟是 UTC
+BEIJING_TZ = datetime.timezone(datetime.timedelta(hours=8))
 
 # ===== 以下转换逻辑移植自上游 convert.py，保持规则一致 =====
 
@@ -311,6 +325,26 @@ def write_rules_version():
         f.write(f'{BUILD_RULES_VERSION}\n')
 
 
+def current_week_monday(today=None):
+    """给定日期（默认北京时间今天）所在 ISO 周的周一日期"""
+    if today is None:
+        today = datetime.datetime.now(BEIJING_TZ).date()
+    return today - datetime.timedelta(days=today.weekday())
+
+
+def weekly_build_done(monday):
+    try:
+        with open(WEEKLY_STATE_FILE, encoding='utf-8') as f:
+            return f.read().strip() == monday.isoformat()
+    except OSError:
+        return False
+
+
+def write_weekly_build(monday):
+    with open(WEEKLY_STATE_FILE, 'w', encoding='utf-8') as f:
+        f.write(f'{monday.isoformat()}\n')
+
+
 def main():
     parser = argparse.ArgumentParser(description='从维基媒体标题 dump 自建 zhwiki 系词库')
     parser.add_argument('--only', choices=DUMP_PROJECTS, action='append',
@@ -327,6 +361,13 @@ def main():
     # 过滤规则变更（BUILD_RULES_VERSION 递增）时强制重建一次
     force = args.force or not rules_version_matches()
 
+    # 每周一构建；非周一运行时若本周一尚未成功构建（如周一运行失败或
+    # 未运行）则补建。--force 与 --only 为人工指定，不受周门槛约束
+    monday = current_week_monday()
+    if not force and not args.only and weekly_build_done(monday):
+        print(f"本周（{monday.isoformat()} 起）已完成构建，跳过")
+        return 0
+
     projects = args.only or DUMP_PROJECTS
     failed = []
     for project in projects:
@@ -341,6 +382,9 @@ def main():
 
     if not failed:
         write_rules_version()
+        # --only 属部分构建，不记周状态，留待整周构建覆盖其余词库
+        if not args.only:
+            write_weekly_build(monday)
         print('全部词库构建完成')
     else:
         print(f"以下词库未更新: {', '.join(failed)}")

@@ -83,14 +83,10 @@ jobs:
           python3 scripts/update_dicts.py
 
       - name: Build zhwiki dictionaries from dumps (weekly)
-        # 维基 dump 约每月一批，每周一（北京时间）检查并跟进最新一批；
-        # 脚本内部按 dump 日期去重，同一批不会重复构建
-        run: |
-          if [ "$(TZ=Asia/Shanghai date +%u)" = "1" ]; then
-            python3 scripts/build_zhwiki.py
-          else
-            echo "今天不是周一（北京时间），跳过 dump 自建"
-          fi
+        # 维基 dump 约每月一批，每周构建一次；脚本内部按 ISO 周去重（一
+        # 周之首是周一，周日属上周）：周一运行即构建，周一未构建（失败
+        # 或未运行）则本周内首个运行补建，同一批 dump 另按版本门槛去重
+        run: python3 scripts/build_zhwiki.py
 
       - name: Merge files
         run: |
@@ -217,6 +213,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add scripts/.rime_ice_hash scripts/.zhwiki_build_rules
+          git add scripts/.rime_ice_hash scripts/.zhwiki_build_rules scripts/.zhwiki_weekly_build
           git diff --cached --quiet || git commit -m "chore: 更新上游仓库 hash 记录"
           git push
