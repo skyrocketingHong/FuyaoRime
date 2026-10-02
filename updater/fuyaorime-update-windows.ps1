@@ -45,7 +45,7 @@ function Save-Asset([string]$Url, [string]$Dest) {
 }
 
 function Remove-DeletedFiles([string]$ReadmePath) {
-    # 删除清单固定在「已从配置包移除」段，条目形如「  - 相对路径」
+    # 删除清单固定在"已从配置包移除"段，条目形如 "  - 相对路径"
     $inDeleted = $false
     foreach ($line in Get-Content $ReadmePath -Encoding UTF8) {
         if (-not $inDeleted) {
@@ -68,7 +68,7 @@ function Invoke-Redeploy {
         Start-Process -FilePath $deployer.FullName -ArgumentList '/deploy'
         Write-Log '已通知小狼毫重新部署'
     } else {
-        Write-Log '未找到 WeaselDeployer.exe，请在小狼毫菜单手动选择「重新部署」'
+        Write-Log '未找到 WeaselDeployer.exe，请在小狼毫菜单手动选择"重新部署"'
     }
 }
 

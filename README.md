@@ -58,12 +58,12 @@ FuyaoRime 是一个自动更新的 Rime 输入法配置仓库。它从上游 [�
 
 - macOS 与 Windows 皮肤（薄荷绿、柑橘黄，均含明暗两套）
 - `overlay/melt_eng.custom.yaml`：英文方案的全小写拼写派生放宽到三字母，输 `ios` 可直接出 `iOS`（NBA、IBM、CPU 等三字母缩写同样受益；上游仅对四个字母以上词条派生全小写）
-- 额外词库（中文维基百科、维基文库、维基词典每日取 [felixonmars/fcitx5-pinyin-zhwiki](https://github.com/felixonmars/fcitx5-pinyin-zhwiki) 最新版，每周另从 [维基媒体 dump](https://dumps.wikimedia.org/) 自建以跟进上游尚未发布的批次，周一漏建则本周内补建；自建版过滤判决书等司法文书标题与连字符开头词条）：
+- 额外词库（中文维基百科、维基文库、维基词典每日取 [felixonmars/fcitx5-pinyin-zhwiki](https://github.com/felixonmars/fcitx5-pinyin-zhwiki) 最新版；每月另自建以跟进上游尚未发布的批次：三库从 [维基媒体 dump](https://dumps.wikimedia.org/) 构建，web-slang 每日快照维基百科《中国大陆网络用语列表》页面、内容无变化不更新，上游 release 自 20260416 后未再更新；自建版过滤判决书等司法文书标题与连字符开头词条）：
   - 中文维基百科（`zhwiki`）
   - 维基文库（`zhwikisource`）
   - 维基词典（`zhwiktionary`）
   - 萌娘百科（`moegirl`）
-  - 网络俚语（`web-slang`）
+  - 网络俚语（`web-slang`，每日快照《中国大陆网络用语列表》）
   - 中国地名（`cn_places`）
   - 流行新词（`popular_new_words`）
   - 中文人名（`chinese_names`，姓氏与名字，由语料自动生成）
@@ -83,9 +83,9 @@ FuyaoRime 是一个自动更新的 Rime 输入法配置仓库。它从上游 [�
    - macOS：`~/Library/Rime/`
    - Windows：`%APPDATA%\Rime\`
    - Linux：`~/.config/rime/`
-4. 重新部署 Rime（鼠须管、小狼毫在输入法菜单中选择「重新部署」）。
+4. 重新部署 Rime（鼠须管、小狼毫在输入法菜单中选择"重新部署"）。
 
-下载与覆盖可交给自动更新脚本完成，见下文[「自动增量更新」](#自动增量更新)。
+下载与覆盖可交给自动更新脚本完成，见下文["自动增量更新"](#自动增量更新)。
 
 ## 自动增量更新
 
@@ -195,8 +195,7 @@ FuyaoRime/
 │   ├── merge.sh                  # 合并脚本
 │   ├── update_dicts.py           # 额外词库更新脚本
 │   ├── .rime_ice_hash            # 上游 commit 记录
-│   ├── .zhwiki_build_rules       # zhwiki 构建规则版本
-│   └── .zhwiki_weekly_build      # zhwiki 每周构建记录
+│   └── .zhwiki_build_rules       # zhwiki 构建规则版本
 ├── updater/
 │   ├── fuyaorime-update-linux.sh     # Linux 客户端自动增量更新
 │   ├── fuyaorime-update-macos.sh     # macOS 客户端自动增量更新
@@ -213,7 +212,7 @@ FuyaoRime/
 1. 拉取雾凇拼音最新版本；
 2. 下载万象拼音语言模型；
 3. 更新额外词库（维基系词库取上游 release 中日期最新的文件）；
-4. 每周从维基媒体 dump 自建 zhwiki 系词库（周一运行，周一漏建则本周内首个运行补建；dump 约每月一批，脚本按日期去重，不会重复构建）；
+4. 每日运行 build_zhwiki.py：三库跟进维基媒体每月 1 日的 dump 新批次（就绪时间不固定，未就绪则每日重试，同一批次按日期去重不重复构建），web-slang 每日快照《中国大陆网络用语列表》页面、内容无变化不更新；
 5. 合并所有文件，保留全部输入方案与自定义配置；
 6. 生成全量包 `fuyaorime-*.zip` 与相对上一版的增量包 `*-diff-from-*.zip`，发布到 Releases。
 
@@ -236,7 +235,7 @@ FuyaoRime/
 
 ### 标点行为
 
-已关闭「数字、字母后标点自动半角」，标点一律按全角映射处理：数字后的逗号、句号、冒号不再作为数字分隔符（`3.14`、`1,000` 不会整体上屏）；`www.`、`https:` 等前缀与 `abc_`、`name@site` 等写法中的标点也不再保持半角。输入网址、邮箱或代码标识符时，可按 Shift 临时切换英文模式。相关补丁位于 `overlay/default.custom.yaml`（`punctuator/digit_separators` 与 `recognizer/patterns`）。
+已关闭"数字、字母后标点自动半角"，标点一律按全角映射处理：数字后的逗号、句号、冒号不再作为数字分隔符（`3.14`、`1,000` 不会整体上屏）；`www.`、`https:` 等前缀与 `abc_`、`name@site` 等写法中的标点也不再保持半角。输入网址、邮箱或代码标识符时，可按 Shift 临时切换英文模式。相关补丁位于 `overlay/default.custom.yaml`（`punctuator/digit_separators` 与 `recognizer/patterns`）。
 
 ## 致谢
 

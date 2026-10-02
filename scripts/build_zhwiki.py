@@ -7,22 +7,24 @@ build_zhwiki.py - 从维基媒体 dump 自建 zhwiki 系词库
 不含正文），转换流程移植自 felixonmars/fcitx5-pinyin-zhwiki 的 Makefile
 与 convert.py：OpenCC 繁转简、标题过滤、pypinyin 标注拼音。
 
-维基 dump 约每月发布一批，因此按需构建：仅当最新 dump 日期新于
-custom_dicts/ 下对应词库的版本号时才下载并重建，同一批 dump 不会重复
-构建。自建产物版本号取 dump 日期（YYYYMMDD），与上游 release 的日期版
-本可比：update_dicts.py 侧已有本地版本新于远端则跳过的保护，本脚本侧
-的版本门槛保证不会用旧 dump 覆盖新内容。
+维基 dump 每月 1 日（维基媒体时区）发布一批，但标题文件就绪时间不固
+定：实测 zhwiki 在 1 日 11:00～14:00 UTC 之间居多，2026 年 8 月批次拖
+到 4 日，zhwikisource 曾拖到 2 日。因此按月去重、以当月批次为目标：
+每月 1 日（北京时间）起开始检查，批次未就绪则由每日运行重试，当月批
+次全部建成后才停止检查。自建产物版本号取 dump 日期（YYYYMMDD），与
+上游 release 的日期版本可比：update_dicts.py 侧已有本地版本新于远端
+则跳过的保护，本脚本侧的版本门槛保证不会用旧 dump 覆盖新内容。
 
-构建节奏为每周一次，按 ISO 周去重：一周之首是周一（周日仍属上周），
-本周已成功构建则跳过；周一的运行失败或未发生时，本周内后续运行自动
-补建。状态文件 scripts/.zhwiki_weekly_build 记录最近一次成功构建所
-在周的周一日期，须入库以跨 CI 运行保留。
+web-slang 单独处理：数据源是维基百科页面《中国大陆网络用语列表》的
+实时 wikitext（转换逻辑移植自上游 zhwiki-web-slang.py），上游 release
+自 20260416 后未再更新，改为每日尝试快照自建；页面内容无变化时不落
+盘、版本号不变，有变化时版本号取快照日期。
 
 依赖：opencc、pypinyin、regex、more-itertools（pip 安装）
 
 用法：
-    python3 scripts/build_zhwiki.py                # 构建全部三库（每周一次）
-    python3 scripts/build_zhwiki.py --only zhwiki  # 只构建 zhwiki（不记周状态）
+    python3 scripts/build_zhwiki.py                # 构建全部词库（每月一次）
+    python3 scripts/build_zhwiki.py --only zhwiki  # 只构建 zhwiki（不记月状态）
     python3 scripts/build_zhwiki.py --force        # 忽略版本门槛强制重建
 
 单个词库构建失败只打印告警、保留现有词库（回退到上游下载版本），不中
@@ -32,12 +34,14 @@ custom_dicts/ 下对应词库的版本号时才下载并重建，同一批 dump 
 import argparse
 import datetime
 import gzip
+import json
 import logging
 import os
 import re
 import sys
 import tempfile
 import unicodedata
+import urllib.parse
 import urllib.request
 
 import opencc
@@ -49,19 +53,19 @@ DUMP_PROJECTS = ['zhwiki', 'zhwiktionary', 'zhwikisource']
 DUMPS_INDEX_URL = 'https://dumps.wikimedia.org/{}/'
 TITLES_GZ_URL = 'https://dumps.wikimedia.org/{project}/{date}/{project}-{date}-all-titles-in-ns0.gz'
 
+WEB_SLANG_PAGE = '中国大陆网络用语列表'
+WEB_SLANG_API_URL = ('https://zh.wikipedia.org/w/rest.php/v1/page/'
+                     + urllib.parse.quote(WEB_SLANG_PAGE))
+
 # 生成规则版本：变更过滤规则时递增，与 scripts/.zhwiki_build_rules 中
 # 记录的版本不一致即强制重建（词库版本号仍是 dump 日期，无法体现规则
 # 变化）
 # 1: 上游 convert.py 原样移植
-# 2: 过滤判决书等司法文书标题与「-」开头的词目
+# 2: 过滤判决书等司法文书标题与连字符开头的词目
 BUILD_RULES_VERSION = 2
 RULES_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.zhwiki_build_rules')
 
-# 每周构建状态：记录最近一次成功构建所在 ISO 周的周一。weekday() 周一
-# 为 0、周日为 6，周日回退到的仍是同一个周一，属上周，不提前触发新一周
-WEEKLY_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.zhwiki_weekly_build')
-
-# 定时任务以北京时间为准判定周几，运行器系统时钟是 UTC
+# 版本日期与月度目标均以北京时间为准，运行器系统时钟是 UTC
 BEIJING_TZ = datetime.timezone(datetime.timedelta(hours=8))
 
 # ===== 以下转换逻辑移植自上游 convert.py，保持规则一致 =====
@@ -193,6 +197,84 @@ def convert_titles(titles_path):
                 previous_title = title
 
 
+# ===== web-slang：解析逻辑移植自上游 zhwiki-web-slang.py =====
+
+def fetch_web_slang_wikitext():
+    # 维基媒体 API 要求可识别的 User-Agent
+    req = urllib.request.Request(
+        WEB_SLANG_API_URL,
+        headers={'User-Agent': 'FuyaoRime/1.0 (https://github.com/skyrocketingHong/FuyaoRime)'})
+    with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
+        return json.loads(resp.read().decode('utf-8'))['source']
+
+
+def trim_templates(wikitext):
+    template_level = 0
+    new_wikitext = ""
+    while True:
+        assert template_level >= 0, ValueError("Unbalanced template in wikitext:\n" + wikitext)
+        pre_open, open_tag, post_open = wikitext.partition("{{")
+        pre_close, close_tag, post_close = wikitext.partition("}}")
+        if open_tag and (not close_tag or len(pre_open) < len(pre_close)):
+            wikitext = post_open
+            if template_level == 0:
+                new_wikitext += pre_open
+            template_level += 1
+        elif close_tag:
+            wikitext = post_close
+            template_level -= 1
+        else:
+            assert template_level == 0, ValueError("Unbalanced template in wikitext:\n" + wikitext)
+            assert open_tag == close_tag == "", RuntimeError("Cosmic radiation detected")
+            new_wikitext += wikitext
+            break
+    return new_wikitext
+
+
+def process_web_slang(wikitext):
+    """从页面 wikitext 提取词条，保持页面顺序去重"""
+    wikitext = trim_templates(wikitext)
+    words = {}
+
+    def add_word(word):
+        for garbage in ("[", "]", "…", ":", "：", ")", "）", '"', "“", "”", "-{", "}-", "简称", "簡稱"):
+            word = word.replace(garbage, "")
+        words[word.strip()] = None
+
+    def add_words(word):
+        for word_separator in ("、", "/", "|", "，", "。", "?", "？", "(", "（"):
+            if word_separator in word:
+                for w in word.split(word_separator):
+                    add_words(w.strip())
+                break
+        else:
+            add_word(word)
+
+    def iter_bolds(line):
+        line_bak = line
+        while "'''" in line:
+            _, sep1, line = line.partition("'''")
+            bold, sep2, line = line.partition("'''")
+            assert sep1 and sep2, ValueError("Unclosed ''' in line: " + line_bak)
+            yield bold
+
+    for line in wikitext.split("\n"):
+        if not line.startswith("*"):
+            continue
+        line = line.strip("*").strip()
+        pre_colon, sep, post_colon = line.partition("'''：")
+        if not sep:
+            pre_colon, sep, post_colon = line.partition("''':")
+        for bold in iter_bolds(pre_colon + sep):
+            add_words(bold)
+        for bold in iter_bolds(post_colon):
+            # 冒号后的粗体跳过缩写来源（长度通常不大于 2）
+            if len(bold) > 2:
+                add_words(bold)
+
+    return words
+
+
 # ===== 构建流程 =====
 
 HTTP_TIMEOUT = 60  # 秒，连接与每次读取的超时
@@ -288,7 +370,7 @@ def build_project(project, dest_file, force=False):
         entries = set()
         count = 0
         for word, pinyin in convert_titles(titles_path):
-            # 纯连字符类标题（如「--」）会得到空拼音；「-D」「-i」等词缀
+            # 纯连字符类标题（如 "--"）会得到空拼音；"-D"、"-i" 等词缀
             # 条目以连字符开头，均无输入价值。上游成品同样存在这些行、
             # 由下载路径的 cleanup_dict_file 清理，这里直接过滤保持一致
             if not pinyin or word.startswith('-'):
@@ -311,6 +393,38 @@ def build_project(project, dest_file, force=False):
         return True
 
 
+def build_web_slang(dest_file, force=False):
+    print(f"[web-slang] 抓取《{WEB_SLANG_PAGE}》并重建词库...")
+    words = process_web_slang(fetch_web_slang_wikitext())
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        words_path = os.path.join(tmp_dir, 'web-slang.source')
+        with open(words_path, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(words) + '\n')
+        entries = set()
+        for word, pinyin in convert_titles(words_path):
+            if not pinyin or word.startswith('-'):
+                continue
+            entries.add(f'{word}\t{pinyin}\n')
+    body = ''.join(sorted(entries))
+
+    # 内容未变化不落盘，版本号不随快照逐日空转
+    if not force and os.path.exists(dest_file):
+        with open(dest_file, encoding='utf-8') as f:
+            old_body = f.read().split('\n...\n', 1)[-1]
+        if old_body == body:
+            print(f"[web-slang] 页面内容无变化，跳过（{len(entries)} 条）")
+            return True
+
+    version = datetime.datetime.now(BEIJING_TZ).date().strftime('%Y%m%d')
+    tmp_dict = dest_file + '.tmp'
+    with open(tmp_dict, 'w', encoding='utf-8') as f:
+        f.write(f'---\nname: web-slang\nversion: "{version}"\nsort: by_weight\n...\n')
+        f.write(body)
+    os.replace(tmp_dict, dest_file)
+    print(f"[web-slang] 成功生成 {dest_file}（{len(entries)} 条，版本 {version}）")
+    return True
+
+
 def rules_version_matches():
     try:
         with open(RULES_STATE_FILE, encoding='utf-8') as f:
@@ -324,29 +438,24 @@ def write_rules_version():
         f.write(f'{BUILD_RULES_VERSION}\n')
 
 
-def current_week_monday(today=None):
-    """给定日期（默认北京时间今天）所在 ISO 周的周一日期"""
+def month_target(today=None):
+    """当月批次日期（YYYYMM01），dump 目录固定为每月 1 日"""
     if today is None:
         today = datetime.datetime.now(BEIJING_TZ).date()
-    return today - datetime.timedelta(days=today.weekday())
+    return today.strftime('%Y%m') + '01'
 
 
-def weekly_build_done(monday):
-    try:
-        with open(WEEKLY_STATE_FILE, encoding='utf-8') as f:
-            return f.read().strip() == monday.isoformat()
-    except OSError:
-        return False
-
-
-def write_weekly_build(monday):
-    with open(WEEKLY_STATE_FILE, 'w', encoding='utf-8') as f:
-        f.write(f'{monday.isoformat()}\n')
+def monthly_build_done(dict_dir, target):
+    for name in DUMP_PROJECTS:
+        version = get_local_dict_version(os.path.join(dict_dir, f'{name}.dict.yaml'))
+        if not version or version < target:
+            return False
+    return True
 
 
 def main():
     parser = argparse.ArgumentParser(description='从维基媒体标题 dump 自建 zhwiki 系词库')
-    parser.add_argument('--only', choices=DUMP_PROJECTS, action='append',
+    parser.add_argument('--only', choices=DUMP_PROJECTS + ['web-slang'], action='append',
                         help='只构建指定词库，可重复传入')
     parser.add_argument('--force', action='store_true',
                         help='忽略版本门槛，强制重建')
@@ -360,30 +469,38 @@ def main():
     # 过滤规则变更（BUILD_RULES_VERSION 递增）时强制重建一次
     force = args.force or not rules_version_matches()
 
-    # 周一构建；本周一未成功构建（失败或未运行）则非周一运行补建。
-    # --force 与 --only 为人工指定，不受周门槛约束
-    monday = current_week_monday()
-    if not force and not args.only and weekly_build_done(monday):
-        print(f"本周（{monday.isoformat()} 起）已完成构建，跳过")
-        return 0
-
-    projects = args.only or DUMP_PROJECTS
+    # dump 三库月度门槛：版本均不早于当月批次（YYYYMM01）即本月已完成，
+    # 不再访问 dump 站点；未达标（含批次未就绪）由每日运行重试。
+    # --force 与 --only 为人工指定，不受门槛约束
+    target = month_target()
+    dump_projects = [p for p in (args.only or DUMP_PROJECTS) if p != 'web-slang']
     failed = []
-    for project in projects:
-        try:
-            if not build_project(project, os.path.join(target_dir, f'{project}.dict.yaml'),
-                                 force=force):
+
+    if not force and not args.only and monthly_build_done(target_dir, target):
+        print(f'当月 dump 批次（{target}）均已构建，跳过三库自建')
+    else:
+        for project in dump_projects:
+            try:
+                if not build_project(project, os.path.join(target_dir, f'{project}.dict.yaml'),
+                                     force=force):
+                    failed.append(project)
+            except Exception as e:
+                # 单库失败保留现有词库（上游下载版本兜底），不中止整体
+                print(f"[{project}] 构建失败，保留现有词库: {e}")
                 failed.append(project)
+
+    # web-slang 每日尝试快照，内容无变化不落盘
+    if not args.only or 'web-slang' in args.only:
+        try:
+            if not build_web_slang(os.path.join(target_dir, 'web-slang.dict.yaml'),
+                                   force=force):
+                failed.append('web-slang')
         except Exception as e:
-            # 单库失败保留现有词库（上游下载版本兜底），不中止整体
-            print(f"[{project}] 构建失败，保留现有词库: {e}")
-            failed.append(project)
+            print(f"[web-slang] 构建失败，保留现有词库: {e}")
+            failed.append('web-slang')
 
     if not failed:
         write_rules_version()
-        # --only 属部分构建，不记周状态，留待整周构建覆盖其余词库
-        if not args.only:
-            write_weekly_build(monday)
         print('全部词库构建完成')
     else:
         print(f"以下词库未更新: {', '.join(failed)}")

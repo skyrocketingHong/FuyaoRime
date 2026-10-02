@@ -113,7 +113,7 @@ def pick_latest_asset(assets, dict_name, pattern):
     """在 release assets 中为 dict_name 挑选最新文件。
 
     felixonmars/fcitx5-pinyin-zhwiki 不再为每批词库发新 release，而是把
-    「名称-YYYYMMDD.dict.yaml」持续追加到同一 release；API 返回的 assets
+    "名称-YYYYMMDD.dict.yaml"持续追加到同一 release；API 返回的 assets
     按上传时间升序排列，因此必须取文件名日期最大者，不能取第一个匹配项。
     返回 (download_url, remote_version)；remote_version 仅对带日期命名的
     asset 有值，无日期命名的（如 moegirl.dict.yaml）返回 None。
@@ -149,7 +149,7 @@ def get_sogou_dict_update_date(dict_id):
 
 
 def cleanup_dict_file(filepath):
-    """清理上游词库的无效词目：「--」「——」占位行与以连字符开头的词目
+    """清理上游词库的无效词目："--"、"——"占位行与以连字符开头的词目
 
     （如 zhwiki 的 -D、-i，系维基词缀类条目，无输入价值）"""
     try:

@@ -22,7 +22,7 @@ jobs:
         run: echo "DATE=$(TZ=Asia/Shanghai date +%Y%m%d)" >> $GITHUB_ENV
 
       - name: Download previous release package
-        # 最新已发布且非当天 tag 的全量包：恢复 custom_dicts 起点＋增量
+        # 最新已发布且非当天 tag 的全量包：恢复 custom_dicts 起点 + 增量
         # 包基线；不能取列表序号（草稿排在已发布之后，.[1] 会取到前天）
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -65,7 +65,7 @@ jobs:
             > upstream/wanxiang/version.txt
 
       - name: Restore custom_dicts from previous package
-        # 词库不入库：从上一版全量包恢复起点，「本地版本新于远端则跳过」
+        # 词库不入库：从上一版全量包恢复起点，"本地版本新于远端则跳过"
         # 的保护才能跨运行生效
         run: |
           if [ -z "$PREV_TAG" ]; then
@@ -80,9 +80,9 @@ jobs:
           pip3 install pypinyin opencc regex more-itertools
           python3 scripts/update_dicts.py
 
-      - name: Build zhwiki dictionaries from dumps (weekly)
-        # 脚本按 ISO 周去重（周一为一周之首）：周一构建，漏建则本周内补
-        # 建；dump 批次另按版本门槛去重
+      - name: Build zhwiki dictionaries from dumps (monthly)
+        # dump 三库按月去重：当月批次建成即停，未就绪由每日运行重试；
+        # web-slang 每日快照维基页面，内容无变化不落盘
         run: python3 scripts/build_zhwiki.py
 
       - name: Merge files
@@ -209,6 +209,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add scripts/.rime_ice_hash scripts/.zhwiki_build_rules scripts/.zhwiki_weekly_build
+          git add scripts/.rime_ice_hash scripts/.zhwiki_build_rules
           git diff --cached --quiet || git commit -m "chore: 更新上游仓库 hash 记录"
           git push
