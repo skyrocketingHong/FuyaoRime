@@ -73,14 +73,61 @@ validate_diff() {
     [ "$version" = "适用版本: $2 -> $3" ]
 }
 
-apply_diff() {
-    # 写入中断后无法再信任旧基线，下次运行须使用全量包。
+is_protected_path() {
+    local path
+    path=$(printf '%s' "$1" | LC_ALL=C tr '[:upper:]' '[:lower:]')
+    case "/$path/" in
+        */installation.yaml/*|*/userdb/*|*/*.userdb/*) return 0 ;;
+    esac
+    return 1
+}
+
+assert_safe_target() {
+    local rest="$1" part target="$RIME_DIR"
+    case "$rest" in
+        ""|/*|*\\*|*:*) log "拒绝不安全的更新路径"; return 1 ;;
+    esac
+    case "/$rest/" in */../*) log "拒绝越出配置目录的路径"; return 1 ;; esac
+    while [ -n "$rest" ]; do
+        part="${rest%%/*}"
+        if [ "$rest" = "$part" ]; then rest=""; else rest="${rest#*/}"; fi
+        [ -n "$part" ] && [ "$part" != "." ] || continue
+        target="$target/$part"
+        [ ! -L "$target" ] || { log "更新路径包含符号链接，已停止"; return 1; }
+    done
+}
+
+extract_package() {
+    local path
+    unzip -Z1 "$1" > "$WORK_DIR/package-files.txt"
+    while IFS= read -r path; do
+        is_protected_path "$path" && continue
+        assert_safe_target "$path" || return 1
+    done < "$WORK_DIR/package-files.txt"
+    unzip -Z -l "$1" | awk '$1 ~ /^l/ {link=1} END {exit link ? 1 : 0}' \
+        || { log "配置包包含符号链接，已停止"; return 1; }
+    # 在解压阶段排除用户数据，不能覆盖后再用可能过期的数据库备份恢复。
     rm -f "$MARKER"
-    unzip -oq "$1" -d "$RIME_DIR"
+    unzip -oq -C "$1" -d "$RIME_DIR" -x \
+        'installation.yaml' '*/installation.yaml' 'installation.yaml/*' '*/installation.yaml/*' \
+        '*.userdb' '*.userdb/*' 'userdb' 'userdb/*' '*/userdb' '*/userdb/*'
+}
+
+apply_diff() {
+    extract_package "$1"
     local readme="$RIME_DIR/INCREMENTAL-README.txt"
     [ -f "$readme" ] || return 0
     awk '/已从配置包移除/ {del=1; next} del && /^  - / {sub(/^  - /, ""); print; next} del {exit}' "$readme" \
-        | while IFS= read -r f; do rm -f -- "$RIME_DIR/$f"; done
+        | while IFS= read -r f; do
+            f="${f%$'\r'}"
+            if is_protected_path "$f"; then
+                log "已忽略用户数据的删除请求"
+                continue
+            fi
+            assert_safe_target "$f" || exit 1
+            [ ! -d "$RIME_DIR/$f" ] || continue
+            rm -f -- "$RIME_DIR/$f"
+        done
     rm -f "$readme"
 }
 
@@ -88,8 +135,7 @@ install_full() {
     fetch "https://github.com/$REPO/releases/download/v$latest/fuyaorime-$latest.zip" \
         "$WORK_DIR/full.zip" || { log "全量包下载失败"; exit 1; }
     unzip -tq "$WORK_DIR/full.zip" >/dev/null 2>&1 || { log "全量包校验失败"; exit 1; }
-    rm -f "$MARKER"
-    unzip -oq "$WORK_DIR/full.zip" -d "$RIME_DIR"
+    extract_package "$WORK_DIR/full.zip"
     log "已应用全量包 $latest"
 }
 

@@ -58,6 +58,50 @@ function Test-DiffVersion([string]$ReadmePath, [string]$FromVersion, [string]$To
     return ($versions.Count -eq 1 -and $versions[0] -ceq "适用版本: $FromVersion -> $ToVersion")
 }
 
+function Test-ProtectedPath([string]$Path) {
+    foreach ($part in ($Path -split '[/\\]')) {
+        if ($part.TrimEnd(' ', '.') -imatch '^(installation\.yaml|userdb|.*\.userdb)$') { return $true }
+    }
+    return $false
+}
+
+function Get-SafeTarget([string]$RelativePath) {
+    if (-not $RelativePath -or [IO.Path]::IsPathRooted($RelativePath) -or $RelativePath.Contains(':')) {
+        throw '拒绝不安全的更新路径'
+    }
+    $target = $RimeDir
+    foreach ($part in ($RelativePath -split '[/\\]')) {
+        if ($part.TrimEnd(' ') -eq '..') { throw '拒绝越出配置目录的路径' }
+        if (-not $part -or $part -eq '.') { continue }
+        $target = Join-Path $target $part
+        if (Test-Path -LiteralPath $target) {
+            $item = Get-Item -LiteralPath $target -Force
+            if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+                throw '更新路径包含符号链接或目录联接，已停止'
+            }
+        }
+    }
+    return $target
+}
+
+function Copy-PackageFiles([string]$Source, [string]$RelativePath = '') {
+    foreach ($item in Get-ChildItem -LiteralPath $Source -Force) {
+        $relative = if ($RelativePath) { "$RelativePath/$($item.Name)" } else { $item.Name }
+        if (Test-ProtectedPath $relative) { continue }
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            throw '配置包包含符号链接或目录联接，已停止'
+        }
+        $target = Get-SafeTarget $relative
+        if ($item.PSIsContainer) {
+            New-Item -ItemType Directory -Path $target -Force | Out-Null
+            Copy-PackageFiles $item.FullName $relative
+        } else {
+            if (Test-Path -LiteralPath $target -PathType Container) { throw '无法用配置文件替换已有目录' }
+            Copy-Item -LiteralPath $item.FullName -Destination $target -Force
+        }
+    }
+}
+
 function Remove-DeletedFiles([string]$ReadmePath) {
     # 删除清单固定在"已从配置包移除"段，条目形如 "  - 相对路径"
     $inDeleted = $false
@@ -65,8 +109,13 @@ function Remove-DeletedFiles([string]$ReadmePath) {
         if (-not $inDeleted) {
             if ($line -match '已从配置包移除') { $inDeleted = $true }
         } elseif ($line -match '^  - (.+)$') {
-            $path = Join-Path $RimeDir $Matches[1]
-            if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force }
+            $relative = $Matches[1]
+            if (Test-ProtectedPath $relative) {
+                Write-Log '已忽略用户数据的删除请求'
+                continue
+            }
+            $path = Get-SafeTarget $relative
+            if (Test-Path -LiteralPath $path -PathType Leaf) { Remove-Item -LiteralPath $path -Force }
         } else {
             $inDeleted = $false
         }
@@ -133,8 +182,7 @@ function Update-FuyaoRime {
 
         # 写入中断后无法再信任旧基线，下次运行须使用全量包。
         if (Test-Path -LiteralPath $Marker) { Remove-Item -LiteralPath $Marker -Force }
-        Get-ChildItem -LiteralPath $packageDir -Force |
-            Copy-Item -Destination $RimeDir -Recurse -Force
+        Copy-PackageFiles $packageDir
         if ($useDiff) {
             Remove-DeletedFiles (Join-Path $packageDir 'INCREMENTAL-README.txt')
             Remove-Item -LiteralPath (Join-Path $RimeDir 'INCREMENTAL-README.txt') -Force

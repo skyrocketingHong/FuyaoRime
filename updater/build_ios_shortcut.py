@@ -65,9 +65,25 @@ def build_workflow(variant="update"):
 
     def install(package):
         action("extract", "unzip", WFArchive=package)
+        action("install-items", "repeat.each", WFInput=output("extract", "Files"),
+               GroupingIdentifier=identifier("install-items-group"), WFControlFlowMode=0)
+        item = {"Value": {"Type": "Variable", "VariableName": "Repeat Item"},
+                "WFSerializationType": "WFTextTokenAttachment"}
+        item_name = {"Value": {**item["Value"], "Aggrandizements": [
+            {"Type": "WFPropertyVariableAggrandizement", "PropertyName": "Name", "PropertyUserInfo": "WFItemName"},
+        ]}, "WFSerializationType": "WFTextTokenAttachment"}
+        action("protected-item", "text.match", text=text(item_name),
+               WFMatchTextPattern=r"^(?:installation(?:\.yaml)?|userdb|.*\.userdb)$",
+               WFMatchTextCaseSensitive=False)
+        condition("protected-if", "protected-group", 0, output("protected-item", "Matches"))
+        action("skip-user-data", "nothing")
+        condition("protected-else", "protected-group", 1)
         action("install", "documentpicker.save", WFFolder=output("folder", "File"),
-               WFInput=output("extract", "Files"), WFAskWhereToSave=False,
+               WFInput=item, WFAskWhereToSave=False,
                WFSaveFileOverwrite=True, WFFileDestinationPath="")
+        condition("protected-end", "protected-group", 2)
+        action("install-items-end", "repeat.each", GroupingIdentifier=identifier("install-items-group"),
+               WFControlFlowMode=2)
         action("deploy", "openurl", WFInput=DEPLOY_URL)
 
     instructions = (
@@ -75,7 +91,8 @@ def build_workflow(variant="update"):
         "再运行“FuyaoRime 元书部署”选择下载好的 ZIP。\n"
         "部署目录应为：我的 iPhone → 元书（Hamster3）→ RimeUserData → 当前方案文件夹。"
         "不要选择 RimeUserData 根目录或 iCloud 目录。\n"
-        "仅使用全量包，不支持 diff；同名内容可能被覆盖，请先备份自定义配置。"
+        "仅使用全量包，不支持 diff；跳过方案根目录的 installation.yaml、userdb 和 *.userdb。"
+        "其他同名内容可能被覆盖，请先备份自定义配置。"
     )
     if variant == "update":
         instructions = "此一体版在快捷指令内下载大文件。若下载长期等待，请改用下载与部署两个独立快捷指令。\n" + instructions

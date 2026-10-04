@@ -91,6 +91,19 @@ class UpdaterCases:
         (self.rime / "config.yaml").write_text("old")
         (self.rime / "obsolete.yaml").write_text("old")
         (self.rime / "personal.userdb").write_text("user data")
+        self.protected = {
+            "installation.yaml": "local installation",
+            "rime_ice.userdb/CURRENT": "local database head",
+            "rime_ice.userdb/000001.ldb": "local learned words",
+            "double_pinyin.userdb/CURRENT": "other schema database",
+            "userdb/records": "local database container",
+            "nested/installation.yaml": "nested installation",
+            "nested/another.userdb/data": "nested learned words",
+        }
+        for name, value in self.protected.items():
+            target = self.rime / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(value)
         self.archive(FULL, {"config.yaml": "full", "added.yaml": "new"})
         self.latest_url = LATEST_URL.replace('/latest', f'/tag/v{LATEST}')
         self.lookup_status = 0
@@ -142,6 +155,56 @@ class UpdaterCases:
         self.assertEqual(self.marker.read_text().strip(), LATEST)
         self.assertEqual((self.rime / "personal.userdb").read_text(), "user data")
         self.assertTrue((self.fixture / "redeployed").exists())
+        for name, value in self.protected.items():
+            self.assertEqual((self.rime / name).read_text(), value, name)
+
+    def test_full_update_preserves_installation_and_databases(self):
+        self.marker.unlink()
+        files = {name: "incoming user data" for name in self.protected}
+        files.update({"config.yaml": "full", "INSTALLATION.YAML": "wrong identity",
+                      "UPPER.USERDB/data": "wrong database", "new.userdb/data": "foreign database"})
+        self.archive(FULL, files)
+        self.run_update()
+        self.assert_installed("full")
+        self.assertFalse((self.rime / "new.userdb").exists())
+        self.assertFalse((self.rime / "UPPER.USERDB").exists())
+
+    def test_diff_cannot_overwrite_or_delete_user_data(self):
+        readme = "适用版本: 20261003 -> 20261004\n\n已从配置包移除\n"
+        readme += "".join(f"  - {name}\n" for name in [*self.protected, "rime_ice.userdb", "obsolete.yaml"])
+        files = {name: "incoming user data" for name in self.protected}
+        files.update({"config.yaml": "diff", "INCREMENTAL-README.txt": readme})
+        self.archive(f"fuyaorime-{LATEST}-diff-from-20261003.zip", files)
+        self.run_update()
+        self.assert_installed("diff")
+        self.assertFalse((self.rime / "obsolete.yaml").exists())
+
+    def test_diff_does_not_delete_parent_directories(self):
+        readme = "适用版本: 20261003 -> 20261004\n\n已从配置包移除\n  - nested\n"
+        self.archive(f"fuyaorime-{LATEST}-diff-from-20261003.zip",
+                     {"config.yaml": "diff", "INCREMENTAL-README.txt": readme})
+        self.run_update()
+        self.assert_installed("diff")
+
+    def test_diff_rejects_deletion_outside_configuration(self):
+        outside = self.fixture / "outside.yaml"
+        outside.write_text("keep")
+        readme = "适用版本: 20261003 -> 20261004\n\n已从配置包移除\n  - ../outside.yaml\n"
+        self.archive(f"fuyaorime-{LATEST}-diff-from-20261003.zip",
+                     {"config.yaml": "diff", "INCREMENTAL-README.txt": readme})
+        self.run_update(success=False)
+        self.assertEqual(outside.read_text(), "keep")
+
+    def test_update_rejects_link_to_user_data(self):
+        alias = self.rime / "alias.yaml"
+        try:
+            alias.symlink_to(self.rime / "installation.yaml")
+        except OSError:
+            self.skipTest("Symbolic links are unavailable")
+        self.archive(FULL, {"config.yaml": "full", "alias.yaml": "wrong identity"})
+        self.run_update(success=False)
+        self.assertEqual((self.rime / "installation.yaml").read_text(), "local installation")
+        self.assertFalse((self.fixture / "redeployed").exists())
 
     def test_missing_or_invalid_marker_uses_full(self):
         for value in (None, "", "unknown"):
