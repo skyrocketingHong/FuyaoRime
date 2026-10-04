@@ -114,7 +114,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\fuyaorime-
 
 ### iOS：元书输入法
 
-提供原生快捷指令的[生成脚本](updater/build_ios_shortcut.py)和[使用说明](updater/IOS.md)。该版本每次下载最新全量包，写入首次授权的元书本地方案目录，再请求重新部署；代理前缀可选，不使用 diff。导入时需要选择手机上的实际目录，iPhone 端的覆盖与部署行为需在首次运行时确认。
+提供原生快捷指令的[生成脚本](updater/build_ios_shortcut.py)和[使用说明](updater/IOS.md)。推荐先用“下载配置”在浏览器中完成全量包下载，再用“元书部署”选择本地 ZIP，写入已授权的方案目录并请求重新部署；另保留一体更新版。代理前缀可选，不使用 diff，iPhone 端的覆盖与部署行为需在首次运行时确认。
 
 ### 每日定时
 
