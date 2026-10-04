@@ -4,13 +4,41 @@
 # 仅在本地版本与最新增量包基线一致时使用 diff，否则下载最新全量包。
 # 写入前校验 INCREMENTAL-README.txt 中的适用版本，不跨版串联增量包。
 #
-# 用法：fuyaorime-update-macos.sh [Rime 目录]
+# 用法：fuyaorime-update-macos.sh [Rime 目录] [--github-proxy URL]
 # 目录缺省 ~/Library/Rime，适合放入 crontab 每日运行。
 
 set -euo pipefail
 
 REPO="skyrocketingHong/FuyaoRime"
-RIME_DIR="${1:-$HOME/Library/Rime}"
+RIME_DIR=""
+GITHUB_PROXY=""
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --github-proxy)
+            [ "$#" -ge 2 ] || { echo "--github-proxy 缺少代理前缀" >&2; exit 2; }
+            GITHUB_PROXY="$2"
+            shift 2
+            ;;
+        -h|--help)
+            echo "用法：${BASH_SOURCE[0]##*/} [Rime 目录] [--github-proxy URL]"
+            exit 0
+            ;;
+        -*) echo "未知选项，请使用 --help 查看用法" >&2; exit 2 ;;
+        *)
+            [ -z "$RIME_DIR" ] || { echo "只能指定一个 Rime 目录" >&2; exit 2; }
+            RIME_DIR="$1"
+            shift
+            ;;
+    esac
+done
+RIME_DIR="${RIME_DIR:-$HOME/Library/Rime}"
+# ASVS 1.2.2、2.2.1：代理前缀仅接受不含查询串、片段及空白的 HTTP(S) 地址。
+proxy_pattern='^https?://[^/?#[:space:]]+(/[^?#[:space:]]*)?$'
+if [ -n "$GITHUB_PROXY" ] && ! [[ "$GITHUB_PROXY" =~ $proxy_pattern ]]; then
+    echo "GitHub 代理前缀必须是有效的 HTTP(S) 地址，且不含查询串、片段或空白" >&2
+    exit 2
+fi
+while [[ "$GITHUB_PROXY" == */ ]]; do GITHUB_PROXY="${GITHUB_PROXY%/}"; done
 MARKER="$RIME_DIR/fuyaorime-version.txt"
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "$WORK_DIR"' EXIT
@@ -18,7 +46,9 @@ trap 'rm -rf "$WORK_DIR"' EXIT
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
 fetch() {
-    curl -fsSL --retry 2 --connect-timeout 15 -o "$2" "$1"
+    local url="$1"
+    if [ -n "$GITHUB_PROXY" ]; then url="$GITHUB_PROXY/$url"; fi
+    curl -fsSL --retry 2 --connect-timeout 15 -o "$2" "$url"
 }
 
 # 公开 Release 跳转不依赖 REST API 的匿名请求额度。

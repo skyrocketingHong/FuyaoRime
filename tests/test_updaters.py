@@ -13,32 +13,49 @@ ROOT = Path(__file__).resolve().parents[1]
 LATEST = "20261004"
 FULL = f"fuyaorime-{LATEST}.zip"
 LATEST_URL = "https://github.com/skyrocketingHong/FuyaoRime/releases/latest"
+DOWNLOAD_URL = f"https://github.com/skyrocketingHong/FuyaoRime/releases/download/v{LATEST}/"
 
 BASH_RUNNER = r'''
-source "$FUYAORIME_SCRIPT" "$FUYAORIME_FIXTURE/rime"
+args=("$FUYAORIME_FIXTURE/rime")
+if [ -n "$FUYAORIME_PROXY" ]; then args+=(--github-proxy "$FUYAORIME_PROXY"); fi
+source "$FUYAORIME_SCRIPT" "${args[@]}"
 curl() {
-    local url
-    for url in "$@"; do :; done
-    printf '%s\n' "$url" >> "$FUYAORIME_FIXTURE/lookups"
-    [ "$url" = 'https://github.com/skyrocketingHong/FuyaoRime/releases/latest' ] || return 22
-    [ "$(cat "$FUYAORIME_FIXTURE/lookup-status")" = 0 ] || return 22
-    cat "$FUYAORIME_FIXTURE/latest-url"
-}
-fetch() {
-    local name="${1##*/}"
+    local url='' dest='' name
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            -o) dest="$2"; shift ;;
+            https://*) url="$1" ;;
+        esac
+        shift
+    done
+    if [ "$url" = 'https://github.com/skyrocketingHong/FuyaoRime/releases/latest' ]; then
+        printf '%s\n' "$url" >> "$FUYAORIME_FIXTURE/lookups"
+        [ "$(cat "$FUYAORIME_FIXTURE/lookup-status")" = 0 ] || return 22
+        cat "$FUYAORIME_FIXTURE/latest-url"
+        return
+    fi
+    printf '%s\n' "$url" >> "$FUYAORIME_FIXTURE/downloads"
+    name="${url##*/}"
     printf '%s\n' "$name" >> "$FUYAORIME_FIXTURE/requests"
     [ -f "$FUYAORIME_FIXTURE/assets/$name" ] || return 1
-    cp "$FUYAORIME_FIXTURE/assets/$name" "$2"
+    cp "$FUYAORIME_FIXTURE/assets/$name" "$dest"
 }
 redeploy() { touch "$FUYAORIME_FIXTURE/redeployed"; }
 main
 '''
 
 POWERSHELL_RUNNER = r'''
-. $Env:FUYAORIME_SCRIPT -RimeDir (Join-Path $Env:FUYAORIME_FIXTURE 'rime')
+. $Env:FUYAORIME_SCRIPT -RimeDir (Join-Path $Env:FUYAORIME_FIXTURE 'rime') -GitHubProxy $Env:FUYAORIME_PROXY
 function Invoke-RestMethod { throw 'REST API must not be called' }
 function Invoke-WebRequest {
-    param([switch]$UseBasicParsing, [string]$Method, [string]$Uri, [int]$TimeoutSec)
+    param([switch]$UseBasicParsing, [string]$Method, [string]$Uri, [int]$TimeoutSec, [string]$OutFile)
+    if ($OutFile) {
+        Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'downloads') $Uri
+        $name = ($Uri -split '/')[-1]
+        Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'requests') $name
+        Copy-Item (Join-Path $Env:FUYAORIME_FIXTURE "assets/$name") $OutFile -ErrorAction Stop
+        return
+    }
     Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'lookups') $Uri
     if ($Uri -ne 'https://github.com/skyrocketingHong/FuyaoRime/releases/latest') {
         throw 'REST API must not be called'
@@ -51,11 +68,6 @@ function Invoke-WebRequest {
         RequestMessage = [PSCustomObject]@{ RequestUri = $url }
     } }
 }
-function Save-Asset([string]$Url, [string]$Dest) {
-    $name = ($Url -split '/')[-1]
-    Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'requests') $name
-    Copy-Item (Join-Path $Env:FUYAORIME_FIXTURE "assets/$name") $Dest -ErrorAction Stop
-}
 function Invoke-Redeploy {
     New-Item (Join-Path $Env:FUYAORIME_FIXTURE 'redeployed') -ItemType File | Out-Null
 }
@@ -67,7 +79,7 @@ class UpdaterCases:
     platform = None
 
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="fuyaorime-test-")
+        self.temp = tempfile.TemporaryDirectory(prefix="fuyaorime test-")
         self.addCleanup(self.temp.cleanup)
         self.fixture = Path(self.temp.name)
         self.rime = self.fixture / "rime"
@@ -82,6 +94,7 @@ class UpdaterCases:
         self.archive(FULL, {"config.yaml": "full", "added.yaml": "new"})
         self.latest_url = LATEST_URL.replace('/latest', f'/tag/v{LATEST}')
         self.lookup_status = 0
+        self.proxy = ""
 
     def archive(self, name, files):
         with zipfile.ZipFile(self.assets / name, "w", zipfile.ZIP_DEFLATED) as package:
@@ -102,11 +115,12 @@ class UpdaterCases:
 
     def run_update(self, success=True):
         (self.fixture / "requests").unlink(missing_ok=True)
+        (self.fixture / "downloads").unlink(missing_ok=True)
         (self.fixture / "redeployed").unlink(missing_ok=True)
         (self.fixture / "lookups").unlink(missing_ok=True)
         (self.fixture / "latest-url").write_text(self.latest_url)
         (self.fixture / "lookup-status").write_text(str(self.lookup_status))
-        env = dict(os.environ, FUYAORIME_FIXTURE=str(self.fixture))
+        env = dict(os.environ, FUYAORIME_FIXTURE=str(self.fixture), FUYAORIME_PROXY=self.proxy)
         extension = "ps1" if self.platform == "windows" else "sh"
         env["FUYAORIME_SCRIPT"] = str(ROOT / "updater" / f"fuyaorime-update-{self.platform}.{extension}")
         if self.platform == "windows":
@@ -143,6 +157,7 @@ class UpdaterCases:
     def test_matching_base_uses_diff_and_deletions(self):
         name = self.diff()
         self.assertEqual(self.run_update(), [name])
+        self.assertEqual((self.fixture / "downloads").read_text().splitlines(), [DOWNLOAD_URL + name])
         self.assert_installed("diff")
         self.assertFalse((self.rime / "obsolete.yaml").exists())
         self.assertFalse((self.rime / "INCREMENTAL-README.txt").exists())
@@ -217,6 +232,34 @@ class UpdaterCases:
         self.assertEqual(self.run_update(success=False), [])
         self.assertEqual(self.marker.read_text().strip(), "20261003")
         self.assertEqual((self.rime / "config.yaml").read_text(), "old")
+
+    def test_download_proxy_routes_full_and_diff(self):
+        self.proxy = "https://downloads.example/forward/"
+        name = self.diff()
+        for version, asset, content in (("", FULL, "full"), ("20261003", name, "diff")):
+            with self.subTest(version=version):
+                self.marker.write_text(version)
+                self.assertEqual(self.run_update(), [asset])
+                self.assert_installed(content)
+                self.assertEqual((self.fixture / "downloads").read_text().splitlines(),
+                                 [self.proxy + DOWNLOAD_URL + asset])
+                self.assertEqual((self.fixture / "lookups").read_text().splitlines(), [LATEST_URL])
+
+    def test_proxy_missing_diff_falls_back_to_proxied_full(self):
+        self.proxy = "https://downloads.example"
+        name = f"fuyaorime-{LATEST}-diff-from-20261003.zip"
+        self.assertEqual(self.run_update(), [name, FULL])
+        self.assert_installed("full")
+        self.assertEqual((self.fixture / "downloads").read_text().splitlines(),
+                         [self.proxy + '/' + DOWNLOAD_URL + asset for asset in (name, FULL)])
+
+    def test_invalid_proxy_fails_before_any_request(self):
+        for proxy in ("file:///tmp/proxy", "https://", "https://bad host", "https://downloads.example/?token=x"):
+            with self.subTest(proxy=proxy):
+                self.proxy = proxy
+                self.assertEqual(self.run_update(success=False), [])
+                self.assertFalse((self.fixture / "lookups").exists())
+                self.assertEqual(self.marker.read_text().strip(), "20261003")
 
     def test_interrupted_write_invalidates_marker(self):
         if self.platform == "windows":

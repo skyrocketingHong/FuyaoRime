@@ -101,6 +101,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\fuyaorime-
 
 自定义目录可通过 `-RimeDir 'D:\Rime'` 传入。更新脚本不包含在配置包中，需要升级脚本时重新执行对应平台的下载命令。
 
+### 可选下载代理
+
+默认直连 GitHub，不预设代理网站。需要通过 GitHub 下载转发服务获取配置包时，可传入以下参数：
+
+| 平台 | 参数 |
+| :--- | :--- |
+| macOS、Linux | `--github-proxy <代理前缀>` |
+| Windows | `-GitHubProxy <代理前缀>` |
+
+代理前缀为完整的 HTTP(S) 地址，可包含服务路径，不含查询串或片段。脚本按“代理前缀 + `/` + 原始 GitHub 下载地址”拼接，仅影响全量包和 diff 包下载；版本查询仍直连 GitHub。省略参数即恢复直连，定时任务可在脚本命令后添加同一参数。
+
 ### 每日定时
 
 以下示例按本机时区在 06:30 运行。先手动执行一次脚本，确认日志中的安装结果与版本标记，再添加定时任务。

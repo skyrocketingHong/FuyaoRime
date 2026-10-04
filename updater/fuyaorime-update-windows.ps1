@@ -10,13 +10,22 @@
 .PARAMETER RimeDir
 Rime 配置目录，默认 %APPDATA%\Rime。
 
+.PARAMETER GitHubProxy
+可选的 GitHub 下载代理前缀，默认直连。仅用于配置包下载。
+
 .EXAMPLE
 .\fuyaorime-update-windows.ps1
 #>
-param([string]$RimeDir = (Join-Path $Env:APPDATA 'Rime'))
+param(
+    [string]$RimeDir = (Join-Path $Env:APPDATA 'Rime'),
+    # ASVS 1.2.2、2.2.1：代理前缀仅接受不含查询串、片段及空白的 HTTP(S) 地址。
+    [ValidatePattern('^$|^https?://[^/?#\s]+(/[^?#\s]*)?$')]
+    [string]$GitHubProxy = ''
+)
 
 $ErrorActionPreference = 'Stop'
 $Repo = 'skyrocketingHong/FuyaoRime'
+$GitHubProxy = $GitHubProxy.TrimEnd('/')
 $Marker = Join-Path $RimeDir 'fuyaorime-version.txt'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
@@ -38,6 +47,7 @@ function Get-LatestVersion {
 }
 
 function Save-Asset([string]$Url, [string]$Dest) {
+    if ($GitHubProxy) { $Url = "$GitHubProxy/$Url" }
     Invoke-WebRequest -Uri $Url -OutFile $Dest -UseBasicParsing
 }
 
