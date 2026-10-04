@@ -2,7 +2,7 @@ name: Sync Rime Dictionaries
 
 on:
   schedule:
-    # 每天凌晨 21:00 UTC (北京时间 05:00)
+    # 计划每天 UTC 21:00（北京时间次日 05:00）触发，实际调度可能延迟
     - cron: '0 21 * * *'
   workflow_dispatch:  # 允许手动触发
 
@@ -18,7 +18,7 @@ jobs:
 
       - name: Set date
         id: date
-        # 用东八区日期，与每日北京时间 05:00 的定时触发保持一致
+        # 使用东八区运行日期，与北京时间的发布日期保持一致
         run: echo "DATE=$(TZ=Asia/Shanghai date +%Y%m%d)" >> $GITHUB_ENV
 
       - name: Download previous release package

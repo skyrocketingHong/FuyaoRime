@@ -15,7 +15,7 @@ FuyaoRime 将[雾凇拼音](https://github.com/iDvel/rime-ice)的配置与词库
 - 保留雾凇拼音的全拼、七种双拼、九键、部件拆字与英文方案。
 - 为全拼配置万象语言模型、额外词库和模糊音。
 - 提供 macOS 与 Windows 的薄荷绿、柑橘黄皮肤，均含明暗变体。
-- 每日北京时间 05:00 触发同步，发布全量包和增量包；三平台更新脚本可用于定时下载和重新部署。
+- 每日计划于北京时间 05:00 触发同步，完成后发布全量包和增量包；GitHub Actions 的实际运行与发布时间可能延迟。
 
 ## 安装配置
 
@@ -114,24 +114,24 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\fuyaorime-
 
 ### 每日定时
 
-以下示例按本机时区在 06:30 运行。先手动执行一次脚本，确认日志中的安装结果与版本标记，再添加定时任务。
+以下示例按本机时区在 09:00 运行。GitHub Actions 的定时任务可能延迟，请根据 Release 的实际发布时间安排客户端更新；运行时新包尚未发布，脚本会使用最近已发布的版本。先手动执行一次脚本，确认日志中的安装结果与版本标记，再添加定时任务。
 
 macOS：执行 `crontab -e`，添加一行：
 
 ```cron
-30 6 * * * /bin/bash "$HOME/bin/fuyaorime-update-macos.sh" >> "$HOME/Library/Logs/fuyaorime-update.log" 2>&1
+0 9 * * * /bin/bash "$HOME/bin/fuyaorime-update-macos.sh" >> "$HOME/Library/Logs/fuyaorime-update.log" 2>&1
 ```
 
 Linux：执行 `crontab -e`，添加一行，配置目录不同时在命令后补充实际路径：
 
 ```cron
-30 6 * * * /bin/bash "$HOME/bin/fuyaorime-update-linux.sh" >> "$HOME/.local/state/fuyaorime-update.log" 2>&1
+0 9 * * * /bin/bash "$HOME/bin/fuyaorime-update-linux.sh" >> "$HOME/.local/state/fuyaorime-update.log" 2>&1
 ```
 
 Windows：在命令提示符中创建任务：
 
 ```bat
-schtasks /Create /SC DAILY /ST 06:30 /TN "FuyaoRime Update" ^
+schtasks /Create /SC DAILY /ST 09:00 /TN "FuyaoRime Update" ^
   /TR "powershell -NoProfile -ExecutionPolicy Bypass -File \"%USERPROFILE%\fuyaorime-update-windows.ps1\""
 ```
 
@@ -176,7 +176,9 @@ schtasks /Create /SC DAILY /ST 06:30 /TN "FuyaoRime Update" ^
 
 ## 同步与构建
 
-[`sync.yml`](.github/workflows/sync.yml) 每日同步雾凇拼音、万象语言模型和额外词库，再叠加 `overlay/` 生成配置包。维基百科、维基文库和维基词典另按月从 Wikimedia 标题数据构建，网络俚语每日检查页面变化。同步也可在 [Actions](https://github.com/skyrocketingHong/FuyaoRime/actions/workflows/sync.yml) 中手动触发。
+[`sync.yml`](.github/workflows/sync.yml) 使用 `0 21 * * *`，计划每天 UTC 21:00（北京时间次日 05:00）触发。GitHub Actions 不保证准点运行，负载较高时可能延后，详见[官方调度说明](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)。
+
+工作流同步雾凇拼音、万象语言模型和额外词库，再叠加 `overlay/` 生成配置包。维基百科、维基文库和维基词典另按月从 Wikimedia 标题数据构建，网络俚语每日检查页面变化。同步也可在 [Actions](https://github.com/skyrocketingHong/FuyaoRime/actions/workflows/sync.yml) 中手动触发。
 
 <details>
 <summary>手动构建配置包</summary>
