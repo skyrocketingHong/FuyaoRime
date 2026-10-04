@@ -112,6 +112,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\fuyaorime-
 
 代理前缀为完整的 HTTP(S) 地址，可包含服务路径，不含查询串或片段。脚本按“代理前缀 + `/` + 原始 GitHub 下载地址”拼接，仅影响全量包和 diff 包下载；版本查询仍直连 GitHub。省略参数即恢复直连，定时任务可在脚本命令后添加同一参数。
 
+### iOS：元书输入法
+
+提供原生快捷指令的[生成脚本](updater/build_ios_shortcut.py)和[使用说明](updater/IOS.md)。该版本每次下载最新全量包，写入首次授权的元书本地方案目录，再请求重新部署；代理前缀可选，不使用 diff。导入时需要选择手机上的实际目录，iPhone 端的覆盖与部署行为需在首次运行时确认。
+
 ### 每日定时
 
 以下示例按本机时区在 09:00 运行。GitHub Actions 的定时任务可能延迟，请根据 Release 的实际发布时间安排客户端更新；运行时新包尚未发布，脚本会使用最近已发布的版本。先手动执行一次脚本，确认日志中的安装结果与版本标记，再添加定时任务。
