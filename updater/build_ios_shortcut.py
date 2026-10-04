@@ -12,15 +12,11 @@ import uuid
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = "https://github.com/skyrocketingHong/FuyaoRime"
 DEPLOY_URL = "hamster3://dev.fuxiao.app.hamster3/rime?action=deploy"
-VARIANTS = {
-    "download": ("FuyaoRimeDownload", "FuyaoRime 下载配置"),
-    "deploy": ("FuyaoRimeYuanshuDeploy", "FuyaoRime 元书部署"),
-    "update": ("FuyaoRimeYuanshu", "FuyaoRime 元书更新"),
-}
+BASENAME = "FuyaoRimeYuanshu"
 
 
 def identifier(name):
-    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"{REPOSITORY}/shortcuts/{name}")).upper()
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"{REPOSITORY}/shortcuts/{BASENAME}/{name}")).upper()
 
 
 def output(name, label="Text"):
@@ -47,9 +43,8 @@ def text(*parts):
     }
 
 
-def build_workflow(variant="update"):
+def build_workflow():
     actions = []
-    questions = []
 
     def action(name, kind, **parameters):
         actions.append({
@@ -57,153 +52,113 @@ def build_workflow(variant="update"):
             "WFWorkflowActionParameters": {"UUID": identifier(name), **parameters},
         })
 
-    def condition(name, group, mode, value=None):
-        parameters = {"GroupingIdentifier": identifier(group), "WFControlFlowMode": mode}
-        if value is not None:
-            parameters.update(WFCondition=100, WFInput={"Type": "Variable", "Variable": value})
-        action(name, "conditional", **parameters)
+    def if_empty(name, group, value):
+        action(name, "conditional", GroupingIdentifier=identifier(group), WFControlFlowMode=0,
+               WFCondition=101, WFInput={"Type": "Variable", "Variable": value})
 
-    def install(package):
-        action("extract", "unzip", WFArchive=package)
-        action("install-items", "repeat.each", WFInput=output("extract", "Files"),
-               GroupingIdentifier=identifier("install-items-group"), WFControlFlowMode=0)
-        item = {"Value": {"Type": "Variable", "VariableName": "Repeat Item"},
-                "WFSerializationType": "WFTextTokenAttachment"}
-        item_name = {"Value": {**item["Value"], "Aggrandizements": [
-            {"Type": "WFPropertyVariableAggrandizement", "PropertyName": "Name", "PropertyUserInfo": "WFItemName"},
-        ]}, "WFSerializationType": "WFTextTokenAttachment"}
-        action("protected-item", "text.match", text=text(item_name),
-               WFMatchTextPattern=r"^(?:installation(?:\.yaml)?|userdb|.*\.userdb)$",
-               WFMatchTextCaseSensitive=False)
-        condition("protected-if", "protected-group", 0, output("protected-item", "Matches"))
-        action("skip-user-data", "nothing")
-        condition("protected-else", "protected-group", 1)
-        action("install", "documentpicker.save", WFFolder=output("folder", "File"),
-               WFInput=item, WFAskWhereToSave=False,
-               WFSaveFileOverwrite=True, WFFileDestinationPath="")
-        condition("protected-end", "protected-group", 2)
-        action("install-items-end", "repeat.each", GroupingIdentifier=identifier("install-items-group"),
-               WFControlFlowMode=2)
-        action("deploy", "openurl", WFInput=DEPLOY_URL)
+    def end_if(name, group):
+        action(name, "conditional", GroupingIdentifier=identifier(group), WFControlFlowMode=2)
 
-    instructions = (
-        "先运行“FuyaoRime 下载配置”，在浏览器中完成全量包下载，"
-        "再运行“FuyaoRime 元书部署”选择下载好的 ZIP。\n"
-        "部署目录应为：我的 iPhone → 元书（Hamster3）→ RimeUserData → 当前方案文件夹。"
-        "不要选择 RimeUserData 根目录或 iCloud 目录。\n"
-        "仅使用全量包，不支持 diff；跳过方案根目录的 installation.yaml、userdb 和 *.userdb。"
+    action("instructions", "comment", WFCommentActionText=(
+        "FuyaoRime · 元书输入法全量更新\n"
+        "选择元书当前使用的本地方案目录：我的 iPhone → 元书（Hamster3）→ RimeUserData → 当前方案文件夹。\n"
+        "下方代理文本留空表示直连；填写 HTTP(S) 转发前缀后用于配置包下载，版本查询仍直连 GitHub。\n"
+        "只下载全量包，不使用 diff；保存时跳过根目录的 installation.yaml、userdb 和 *.userdb。"
         "其他同名内容可能被覆盖，请先备份自定义配置。"
-    )
-    if variant == "update":
-        instructions = "此一体版在快捷指令内下载大文件。若下载长期等待，请改用下载与部署两个独立快捷指令。\n" + instructions
-    action("instructions", "comment", WFCommentActionText=instructions)
+    ))
+    action("folder", "file", WFFile={})
+    action("proxy", "gettext", WFTextActionText=text(""), CustomOutputName="下载代理前缀")
+    action("latest", "url.expand", URL=REPOSITORY + "/releases/latest")
+    action("version", "text.match", text=text(output("latest", "Expanded URL")),
+           WFMatchTextPattern=r"(?<=^https://github\.com/skyrocketingHong/FuyaoRime/releases/tag/v)[0-9]{8}$",
+           WFMatchTextCaseSensitive=True)
+    if_empty("invalid-version", "version-group", output("version", "Matches"))
+    action("version-error", "alert", WFAlertActionTitle="无法确认 FuyaoRime 最新版本",
+           WFAlertActionMessage="请检查 GitHub 连接后重试。本次没有写入配置文件。",
+           WFAlertActionCancelButtonShown=False)
+    action("stop-invalid-version", "exit")
+    end_if("version-end", "version-group")
 
-    if variant != "download":
-        questions.append({"ParameterKey": "WFFile", "Category": "Parameter", "ActionIndex": len(actions),
-                          "Text": "选择元书当前使用的本地方案文件夹（我的 iPhone → 元书 → RimeUserData → 当前方案目录）",
-                          "DefaultValue": {}})
-        action("folder", "file", WFFile={})
-
-    if variant == "deploy":
-        shortcut_input = {"Value": {"Type": "ExtensionInput"}, "WFSerializationType": "WFTextTokenAttachment"}
-        condition("input-if", "input-group", 0, shortcut_input)
-        action("shared-package", "getvariable", WFVariable=shortcut_input)
-        condition("input-else", "input-group", 1)
-        action("select-package", "documentpicker.open", WFShowFilePicker=True, WFSelectMultiple=False)
-        condition("chosen-package", "input-group", 2)
-        filename = output("chosen-package", "If Result")
-        filename["Value"]["Aggrandizements"] = [
-            {"Type": "WFPropertyVariableAggrandizement", "PropertyName": "Name", "PropertyUserInfo": "WFItemName"},
-        ]
-        action("full-package-name", "text.match", text=text(filename),
-               WFMatchTextPattern=r"^fuyaorime-[0-9]{8}(?: (?:\([0-9]+\)|[0-9]+))?(?:\.zip)?$",
-               WFMatchTextCaseSensitive=False)
-        condition("full-package-if", "full-package-group", 0, output("full-package-name", "Matches"))
-        install(output("chosen-package", "If Result"))
-        condition("full-package-else", "full-package-group", 1)
-        action("package-error", "alert", WFAlertActionTitle="请选择 FuyaoRime 全量包",
-               WFAlertActionMessage="选择下载完成的 fuyaorime-YYYYMMDD.zip。此快捷指令不接受 diff 包，也不会修改当前配置。",
-               WFAlertActionCancelButtonShown=False)
-        condition("full-package-end", "full-package-group", 2)
-    else:
-        questions.append({"ParameterKey": "WFTextActionText", "Category": "Parameter", "ActionIndex": len(actions),
-                          "Text": "GitHub 下载代理前缀，可留空直连；仅影响配置包下载", "DefaultValue": ""})
-        action("proxy", "gettext", WFTextActionText="")
-        action("trim-proxy", "text.replace", WFInput=output("proxy"),
-               WFReplaceTextFind="/+$", WFReplaceTextReplace="",
-               WFReplaceTextRegularExpression=True, WFReplaceTextCaseSensitive=True)
-        condition("proxy-if", "proxy-group", 0, output("trim-proxy", "Updated Text"))
-        action("proxy-prefix", "gettext", WFTextActionText=text(output("trim-proxy", "Updated Text"), "/"))
-        condition("proxy-else", "proxy-group", 1)
-        action("direct-prefix", "gettext", WFTextActionText="")
-        condition("download-prefix", "proxy-group", 2)
-        action("latest", "url.expand", URL=REPOSITORY + "/releases/latest")
-        action("version", "text.match", text=text(output("latest", "Expanded URL")),
-               WFMatchTextPattern=r"(?<=^https://github\.com/skyrocketingHong/FuyaoRime/releases/tag/v)[0-9]{8}$",
-               WFMatchTextCaseSensitive=True)
-        condition("version-if", "version-group", 0, output("version", "Matches"))
-        action("download-url", "url", WFURLActionURL=text(
-            output("download-prefix", "If Result"), REPOSITORY + "/releases/download/v",
-            output("version", "Matches"), "/fuyaorime-", output("version", "Matches"), ".zip",
-        ), CustomOutputName="配置包下载地址")
-        if variant == "download":
-            action("browser-download", "openurl", WFInput=output("download-url", "URL"))
-        else:
-            action("package", "downloadurl", WFURL=text(output("download-url", "URL")), WFHTTPMethod="GET")
-            install(output("package", "Contents of URL"))
-        condition("version-else", "version-group", 1)
-        action("version-error", "alert", WFAlertActionTitle="无法确认 FuyaoRime 最新版本",
-               WFAlertActionMessage="请检查 GitHub 连接后重试。本次没有写入配置文件。",
-               WFAlertActionCancelButtonShown=False)
-        condition("version-end", "version-group", 2)
+    action("raw-download-url", "gettext", WFTextActionText=text(
+        output("proxy", "下载代理前缀"), REPOSITORY + "/releases/download/v",
+        output("version", "Matches"), "/fuyaorime-", output("version", "Matches"), ".zip",
+    ))
+    # Replace Text's input must be a WFTextTokenString, not a bare attachment.
+    action("trim-download-url", "text.replace", WFInput=text(output("raw-download-url")),
+           WFReplaceTextFind=text(r"^\s+|\s+$"), WFReplaceTextReplace=text(""),
+           WFReplaceTextRegularExpression=True, WFReplaceTextCaseSensitive=True)
+    action("forwarded-download-url", "text.replace", WFInput=text(output("trim-download-url", "Updated Text")),
+           WFReplaceTextFind=text(r"^(https?://[^\s]+?)[/\s]*(https://github\.com/skyrocketingHong/FuyaoRime/releases/download/\S+)$"),
+           WFReplaceTextReplace=text("$1/$2"), WFReplaceTextRegularExpression=True,
+           WFReplaceTextCaseSensitive=True)
+    action("download-url", "url", WFURLActionURL=text(output("forwarded-download-url", "Updated Text")),
+           CustomOutputName="配置包下载地址")
+    action("package", "downloadurl", WFURL=text(output("download-url", "配置包下载地址")), WFHTTPMethod="GET")
+    action("extract", "unzip", WFArchive=output("package", "Contents of URL"))
+    action("install-items", "repeat.each", WFInput=output("extract", "Files"),
+           GroupingIdentifier=identifier("install-items-group"), WFControlFlowMode=0)
+    item = {"Value": {"Type": "Variable", "VariableName": "Repeat Item"},
+            "WFSerializationType": "WFTextTokenAttachment"}
+    item_name = {"Value": {**item["Value"], "Aggrandizements": [
+        {"Type": "WFPropertyVariableAggrandizement", "PropertyName": "Name", "PropertyUserInfo": "WFItemName"},
+    ]}, "WFSerializationType": "WFTextTokenAttachment"}
+    action("protected-item", "text.match", text=text(item_name),
+           WFMatchTextPattern=r"^(?:installation(?:\.yaml)?|userdb|.*\.userdb)$",
+           WFMatchTextCaseSensitive=False)
+    if_empty("writable-item", "protected-group", output("protected-item", "Matches"))
+    action("install", "documentpicker.save", WFFolder=output("folder", "File"),
+           WFInput=item, WFAskWhereToSave=False, WFSaveFileOverwrite=True, WFFileDestinationPath="")
+    end_if("protected-end", "protected-group")
+    action("install-items-end", "repeat.each", GroupingIdentifier=identifier("install-items-group"), WFControlFlowMode=2)
+    action("deploy", "openurl", WFInput=DEPLOY_URL)
 
     return {
-        "WFWorkflowName": VARIANTS[variant][1],
+        "WFWorkflowName": "FuyaoRime 元书更新",
         "WFWorkflowClientVersion": "5111.0.1",
         "WFWorkflowMinimumClientVersion": 3010,
         "WFWorkflowMinimumClientVersionString": "3010",
         "WFWorkflowIcon": {"WFWorkflowIconStartColor": 946986751, "WFWorkflowIconGlyphNumber": 61440},
         "WFWorkflowActions": actions,
-        "WFWorkflowInputContentItemClasses": ["WFGenericFileContentItem"] if variant == "deploy" else [],
+        "WFWorkflowInputContentItemClasses": [],
         "WFWorkflowOutputContentItemClasses": [],
         "WFWorkflowHasOutputFallback": False,
         "WFWorkflowHasShortcutInputVariables": False,
         "WFQuickActionSurfaces": [],
-        "WFWorkflowTypes": ["ActionExtension", "WFWorkflowTypeShowInSearch"] if variant == "deploy" else ["WFWorkflowTypeShowInSearch"],
-        "WFWorkflowImportQuestions": questions,
+        "WFWorkflowTypes": ["WFWorkflowTypeShowInSearch"],
+        "WFWorkflowImportQuestions": [
+            {"ParameterKey": "WFFile", "Category": "Parameter", "ActionIndex": 1,
+             "Text": "选择元书当前使用的本地方案文件夹（我的 iPhone → 元书 → RimeUserData → 当前方案目录）",
+             "DefaultValue": {}},
+            {"ParameterKey": "WFTextActionText", "Category": "Parameter", "ActionIndex": 2,
+             "Text": "GitHub 下载代理前缀，可留空直连；仅影响配置包下载", "DefaultValue": ""},
+        ],
     }
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=ROOT / "dist" / "ios")
-    parser.add_argument("--variant", choices=[*VARIANTS, "all"], default="all")
     parser.add_argument("--unsigned-only", action="store_true", help="Only emit the inspectable source plist")
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    variants = VARIANTS if args.variant == "all" else [args.variant]
-    for variant in variants:
-        basename = VARIANTS[variant][0]
-        source = args.output_dir / f"{basename}.source.plist"
-        workflow = build_workflow(variant)
-        source.write_bytes(plistlib.dumps(workflow, fmt=plistlib.FMT_XML, sort_keys=False))
-        print(f"Source: {source}", flush=True)
-        if args.unsigned_only:
-            continue
-        unsigned = args.output_dir / f"{basename}.unsigned.shortcut"
-        unsigned.write_bytes(plistlib.dumps(workflow, fmt=plistlib.FMT_BINARY, sort_keys=False))
-        destination = args.output_dir / f"{basename}.shortcut"
-        # Sign on the system volume before copying to an external checkout.
-        with tempfile.TemporaryDirectory(prefix="fuyaorime-shortcut-sign-") as directory:
-            input_directory = Path(directory) / "source"
-            input_directory.mkdir()
-            signing_input = input_directory / destination.name
-            signing_output = Path(directory) / destination.name
-            signing_input.write_bytes(unsigned.read_bytes())
-            subprocess.run(["/usr/bin/shortcuts", "sign", "--mode", "anyone", "--input", str(signing_input),
-                            "--output", str(signing_output)], check=True)
-            destination.write_bytes(signing_output.read_bytes())
-        print(f"Shortcut: {destination}")
+    source = args.output_dir / f"{BASENAME}.source.plist"
+    workflow = build_workflow()
+    source.write_bytes(plistlib.dumps(workflow, fmt=plistlib.FMT_XML, sort_keys=False))
+    print(f"Source: {source}", flush=True)
+    if args.unsigned_only:
+        return
+    destination = args.output_dir / f"{BASENAME}.shortcut"
+    # The signer accepts a binary .shortcut input and writes reliably on the system volume.
+    with tempfile.TemporaryDirectory(prefix="fuyaorime-shortcut-sign-") as directory:
+        input_directory = Path(directory) / "source"
+        input_directory.mkdir()
+        signing_input = input_directory / destination.name
+        signing_output = Path(directory) / destination.name
+        signing_input.write_bytes(plistlib.dumps(workflow, fmt=plistlib.FMT_BINARY, sort_keys=False))
+        subprocess.run(["/usr/bin/shortcuts", "sign", "--mode", "anyone", "--input", str(signing_input),
+                        "--output", str(signing_output)], check=True)
+        destination.write_bytes(signing_output.read_bytes())
+    print(f"Shortcut: {destination}")
 
 
 if __name__ == "__main__":
