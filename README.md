@@ -44,7 +44,7 @@ FuyaoRime 将[雾凇拼音](https://github.com/iDvel/rime-ice)的配置与词库
 
 ## 自动更新
 
-[`updater/`](updater/) 中的脚本查询最新发布，下载配置并尝试重新部署输入法。
+[`updater/`](updater/) 中的脚本通过 GitHub `/releases/latest` 的公开跳转查询最新版本，下载配置并尝试重新部署输入法。客户端更新无需 GitHub Token，也不依赖 REST API 的匿名请求额度。
 
 | 本地状态 | 更新方式 |
 | :--- | :--- |
@@ -124,7 +124,7 @@ schtasks /Create /SC DAILY /ST 06:30 /TN "FuyaoRime Update" ^
   /TR "powershell -NoProfile -ExecutionPolicy Bypass -File \"%USERPROFILE%\fuyaorime-update-windows.ps1\""
 ```
 
-停用时删除对应的 crontab 行，或执行 `schtasks /Delete /TN "FuyaoRime Update" /F`。下载失败时检查网络与 GitHub API 限额；可设置 `GITHUB_TOKEN` 提高 API 请求限额。
+停用时删除对应的 crontab 行，或执行 `schtasks /Delete /TN "FuyaoRime Update" /F`。版本查询或下载失败时，检查网络能否访问 GitHub Release 页面及其下载资源。
 
 ## 输入方案与词库
 

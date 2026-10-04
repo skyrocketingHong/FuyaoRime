@@ -21,15 +21,18 @@ fetch() {
     curl -fsSL --retry 2 --connect-timeout 15 -o "$2" "$1"
 }
 
-# GITHUB_TOKEN 可提高 GitHub API 请求限额。
-release_tags() {
-    local auth=()
-    if [ -n "${GITHUB_TOKEN:-}" ]; then
-        auth=(-H "Authorization: Bearer $GITHUB_TOKEN")
+# 公开 Release 跳转不依赖 REST API 的匿名请求额度。
+latest_version() {
+    local url version
+    url=$(curl -fsSLI --retry 2 --connect-timeout 15 --max-time 45 \
+        -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest") || return 1
+    version="${url##*/v}"
+    if [[ "$version" =~ ^[0-9]{8}$ ]] && [ "$url" = "https://github.com/$REPO/releases/tag/v$version" ]; then
+        printf '%s\n' "$version"
+    else
+        log "Release 页面未返回有效的 FuyaoRime 日期版本" >&2
+        return 1
     fi
-    curl -fsSL --retry 2 ${auth[@]+"${auth[@]}"} \
-        "https://api.github.com/repos/$REPO/releases?per_page=100" \
-        | grep -oE '"tag_name"[[:space:]]*:[[:space:]]*"v[0-9]{8}"' | grep -oE '[0-9]{8}' | sort -u
 }
 
 validate_diff() {
@@ -74,10 +77,8 @@ redeploy() {
 }
 
 main() {
-    local tags latest current
-    tags=$(release_tags) || { log "获取 release 列表失败"; exit 1; }
-    [ -n "$tags" ] || { log "未解析到任何 release"; exit 1; }
-    latest=$(printf '%s\n' "$tags" | tail -1)
+    local latest current
+    latest=$(latest_version) || { log "获取最新 Release 版本失败，请检查 GitHub 连接"; exit 1; }
 
     mkdir -p "$RIME_DIR"
     current=$(cat "$MARKER" 2>/dev/null || true)

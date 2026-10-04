@@ -24,19 +24,17 @@ function Write-Log([string]$Message) {
     Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] $Message"
 }
 
-function Get-Releases {
-    # GITHUB_TOKEN 可提高 GitHub API 请求限额。
-    $headers = @{ 'User-Agent' = 'FuyaoRime-Updater' }
-    if ($Env:GITHUB_TOKEN) { $headers['Authorization'] = "Bearer $Env:GITHUB_TOKEN" }
-    Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases?per_page=100" `
-        -Headers $headers
-}
-
-function Get-DiffAsset($Releases, [string]$Tag, [string]$FromVersion) {
-    $Releases | Where-Object { $_.tag_name -eq "v$Tag" } |
-        ForEach-Object { $_.assets } |
-        Where-Object { $_.name -eq "fuyaorime-$Tag-diff-from-$FromVersion.zip" } |
-        Select-Object -First 1
+function Get-LatestVersion {
+    # 公开 Release 跳转不依赖 REST API 的匿名请求额度。
+    $response = Invoke-WebRequest -UseBasicParsing -Method Head `
+        -Uri "https://github.com/$Repo/releases/latest" -TimeoutSec 45
+    $uri = $response.BaseResponse.ResponseUri
+    if (-not $uri) { $uri = $response.BaseResponse.RequestMessage.RequestUri }
+    $pattern = '^https://github\.com/' + [regex]::Escape($Repo) + '/releases/tag/v([0-9]{8})$'
+    if ([string]$uri.AbsoluteUri -cnotmatch $pattern) {
+        throw 'Release 页面未返回有效的 FuyaoRime 日期版本'
+    }
+    return $Matches[1]
 }
 
 function Save-Asset([string]$Url, [string]$Dest) {
@@ -80,13 +78,7 @@ function Invoke-Redeploy {
 }
 
 function Update-FuyaoRime {
-    $releases = Get-Releases
-    $tags = @($releases | Where-Object { $_.tag_name -cmatch '^v[0-9]{8}$' } |
-        ForEach-Object { $_.tag_name.Substring(1) } | Sort-Object -Unique)
-    if ($tags.Count -eq 0) {
-        throw '未解析到任何 release'
-    }
-    $latest = $tags[-1]
+    $latest = Get-LatestVersion
 
     New-Item -ItemType Directory -Path $RimeDir -Force | Out-Null
     $current = if (Test-Path -LiteralPath $Marker) { ([string](Get-Content -LiteralPath $Marker -Raw)).Trim() } else { '' }
@@ -105,16 +97,13 @@ function Update-FuyaoRime {
         $packageDir = Join-Path $workDir 'package'
         $useDiff = $false
         if ($current -cmatch '^[0-9]{8}$') {
-            $asset = Get-DiffAsset $releases $latest $current
-            if ($asset) {
-                try {
-                    $zip = Join-Path $workDir 'diff.zip'
-                    Save-Asset $asset.browser_download_url $zip
-                    Expand-Archive -Path $zip -DestinationPath $packageDir -Force
-                    $useDiff = Test-DiffVersion (Join-Path $packageDir 'INCREMENTAL-README.txt') $current $latest
-                } catch {
-                    Write-Log '增量包下载或解压失败，使用全量包'
-                }
+            try {
+                $zip = Join-Path $workDir 'diff.zip'
+                Save-Asset "https://github.com/$Repo/releases/download/v$latest/fuyaorime-$latest-diff-from-$current.zip" $zip
+                Expand-Archive -Path $zip -DestinationPath $packageDir -Force
+                $useDiff = Test-DiffVersion (Join-Path $packageDir 'INCREMENTAL-README.txt') $current $latest
+            } catch {
+                Write-Log '增量包下载或解压失败，使用全量包'
             }
             if (-not $useDiff) {
                 Write-Log "无匹配本地版本 $current 的有效增量包，使用全量包 $latest"
