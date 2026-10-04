@@ -1,7 +1,7 @@
 <h1 align="center">FuyaoRime</h1>
 
 <p align="center">
-  自动同步雾凇拼音与万象拼音的 Rime 输入法配置，每日更新词库与语言模型
+  基于雾凇拼音、万象语言模型与扩展词库的 Rime 配置，每日自动同步发布
 </p>
 
 <p align="center">
@@ -10,249 +10,215 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="GPL-3.0"></a>
 </p>
 
-## 简介
+FuyaoRime 将[雾凇拼音](https://github.com/iDvel/rime-ice)的配置与词库、[万象语言模型](https://github.com/amzxyz/RIME-LMDG)及额外词库合并为配置包，供鼠须管、小狼毫和 Linux Rime 客户端使用。
 
-FuyaoRime 是一个自动更新的 Rime 输入法配置仓库。它从上游 [雾凇拼音（rime-ice）](https://github.com/iDvel/rime-ice) 拉取最新配置与词库，下载 [万象拼音](https://github.com/amzxyz/rime_wanxiang) 语言模型（发布于 [RIME-LMDG](https://github.com/amzxyz/RIME-LMDG)），更新额外词库，叠加自定义皮肤与配置后，生成可直接使用的配置包 `fuyaorime-*.zip`，见 [Releases](https://github.com/skyrocketingHong/FuyaoRime/releases)。
+- 保留雾凇拼音的全拼、七种双拼、九键、部件拆字与英文方案。
+- 为全拼配置万象语言模型、额外词库和模糊音。
+- 提供 macOS 与 Windows 的薄荷绿、柑橘黄皮肤，均含明暗变体。
+- 每日北京时间 05:00 触发同步，发布全量包和增量包；三平台更新脚本可用于定时下载和重新部署。
 
-仓库不裁剪雾凇拼音的输入方案：全拼、七种主流双拼与九键方案全部保留，可通过 Rime 方案选单（F4 或 Control+grave）切换。
+## 安装配置
 
-## 声明
+先安装对应平台的 Rime 客户端，再从 [Releases](https://github.com/skyrocketingHong/FuyaoRime/releases/latest) 下载配置包。
 
-本仓库为作者个人使用的输入法配置，一切取舍以个人习惯为准，不承诺对第三方需求提供适配。不接受功能建议与定制类请求；仅接受可复现的同步失败或配置错误报告，相关 Issue 与 Pull Request 可能不予回应或合入。
+| 配置包 | 使用条件 |
+| :--- | :--- |
+| `fuyaorime-YYYYMMDD.zip` | 全量包。首次安装、跨版更新或无法确认本地版本时使用 |
+| `fuyaorime-YYYYMMDD-diff-from-YYYYMMDD.zip` | 增量包。仅适用于已安装版本与 `from` 后日期完全一致的配置 |
 
-## 输入方案
+例如，`fuyaorime-20261004-diff-from-20261003.zip` 只能用于从 `20261003` 更新到 `20261004`；本地若是 `20261001`，应下载全量包。
 
-| 输入方案 | schema_id | 状态 |
-| :--- | :--- | :--- |
-| 雾凇拼音（全拼） | `rime_ice` | 默认启用 |
-| 自然码双拼 | `double_pinyin` | 默认启用 |
-| 智能 ABC 双拼 | `double_pinyin_abc` | 默认启用 |
-| 微软双拼 | `double_pinyin_mspy` | 默认启用 |
-| 搜狗双拼 | `double_pinyin_sogou` | 默认启用 |
-| 小鹤双拼 | `double_pinyin_flypy` | 默认启用 |
-| 紫光双拼 | `double_pinyin_ziguang` | 默认启用 |
-| 拼音加加双拼 | `double_pinyin_jiajia` | 默认启用 |
-| 中文九键 | `t9` | 默认注释，面向仓输入法与元书输入法（移动端） |
-| 部件拆字 | `radical_pinyin` | 作为部首反查与辅码挂载于拼音方案 |
-| Easy English Nano | `melt_eng` | 作为次翻译器挂载于拼音方案 |
+1. 备份现有配置。使用增量包时，先核对包内 `INCREMENTAL-README.txt` 的适用版本与本地版本是否一致。
+2. 将包内文件解压覆盖到客户端实际使用的 Rime 配置目录；使用增量包时按其中的删除清单移除旧文件。
+3. 在输入法菜单中重新部署 Rime。
 
-启用或停用方案：编辑 `overlay/default.custom.yaml` 的 `schema_list`。
+| 平台 | 更新脚本的默认配置目录 |
+| :--- | :--- |
+| macOS | `~/Library/Rime/` |
+| Windows | `%APPDATA%\Rime\` |
+| Linux | `${XDG_CONFIG_HOME:-$HOME/.config}/rime/` |
 
-额外词库、语言模型、模糊音等定制通过 `overlay/rime_ice.custom.yaml` 作用于全拼主方案；切换到双拼方案后使用上游默认配置，如需定制双拼，可按 `rime_ice.custom.yaml` 的写法新增对应的 `overlay/<schema_id>.custom.yaml`（注意不要把全拼的模糊音拼写规则套用到双拼方案）。
+不同 Linux 客户端可能使用不同目录，请以客户端的实际设置为准。自动更新脚本也支持传入自定义目录。
 
-## 包含内容
+`fuyaorime-version.txt` 由更新脚本维护。手动覆盖配置后应删除旧标记，让脚本下次以全量包重新建立版本基线；不要仅修改标记来跳过安装。
 
-### 来自雾凇拼音
+## 自动更新
 
-- 全部输入方案（全拼、七种双拼、九键、部件拆字、英文）
-- 中文词库（8105 字表、41448 大字表、基础词库、扩展词库、腾讯词向量、杂项）
-- 英文词库与各输入方案对应的中英混合词库（`en_dicts/cn_en*.txt`）
-- OpenCC 映射（简繁转换、Emoji 等）
-- Lua 扩展脚本
+[`updater/`](updater/) 中的脚本查询最新发布，下载配置并尝试重新部署输入法。
 
-### 来自万象拼音
+| 本地状态 | 更新方式 |
+| :--- | :--- |
+| 无版本标记或标记无效 | 安装最新全量包 |
+| 与最新版本一致 | 跳过更新 |
+| 比远端版本更新 | 保留本地配置，不降级 |
+| 最新 diff 包的基线与本地版本一致，且包内适用版本校验通过 | 应用该增量包及删除清单 |
+| 跨版、没有匹配的 diff 包，或增量包下载、校验失败 | 下载最新全量包 |
 
-- 语言模型 `wanxiang-lts-zh-hans.gram`
+脚本不会串联历史增量包。写入配置前会使旧版本标记失效，全部文件处理成功后再记录新版本；写入失败后的下一次运行使用全量包。
 
-### 自定义内容
+全量安装采用覆盖方式，不会清空配置目录，也不会自动清理历史版本遗留的全部文件。自行修改的同名配置会被覆盖，请保留备份。
 
-- macOS 与 Windows 皮肤（薄荷绿、柑橘黄，均含明暗两套）
-- `overlay/melt_eng.custom.yaml`：英文方案的全小写拼写派生放宽到三字母，输 `ios` 可直接出 `iOS`（NBA、IBM、CPU 等三字母缩写同样受益；上游仅对四个字母以上词条派生全小写）
-- 额外词库（中文维基百科、维基文库、维基词典每日取 [felixonmars/fcitx5-pinyin-zhwiki](https://github.com/felixonmars/fcitx5-pinyin-zhwiki) 最新版；每月另自建以跟进上游尚未发布的批次：三库从 [维基媒体 dump](https://dumps.wikimedia.org/) 构建，web-slang 每日快照维基百科《中国大陆网络用语列表》页面、内容无变化不更新，上游 release 自 20260416 后未再更新；自建版过滤判决书等司法文书标题与连字符开头词条）：
-  - 中文维基百科（`zhwiki`）
-  - 维基文库（`zhwikisource`）
-  - 维基词典（`zhwiktionary`）
-  - 萌娘百科（`moegirl`）
-  - 网络俚语（`web-slang`，每日快照《中国大陆网络用语列表》）
-  - 中国地名（`cn_places`）
-  - 流行新词（`popular_new_words`）
-  - 中文人名（`chinese_names`，姓氏与名字，由语料自动生成）
-  - 成语俗语（`chengyu_suyu`）
-  - 古诗词名句（`gushi_mingju`）
-  - 唐诗三百首（`tangshi_300`）
+### macOS
 
-## 使用方法
-
-### 方法一：下载 Release 包（推荐）
-
-1. 前往 [Releases](https://github.com/skyrocketingHong/FuyaoRime/releases) 页面；
-2. 下载最新的 `fuyaorime-*.zip`：
-   - `fuyaorime-YYYYMMDD.zip` 为全量包，首次使用或间隔多版时下载；
-   - `fuyaorime-YYYYMMDD-diff-from-YYYYMMDD.zip` 为相对上一版的增量包，已安装紧邻上一版的用户可下载，解压覆盖即可（变更与删除清单见包内 `INCREMENTAL-README.txt`）；
-3. 解压全部内容到 Rime 配置目录：
-   - macOS：`~/Library/Rime/`
-   - Windows：`%APPDATA%\Rime\`
-   - Linux：`~/.config/rime/`
-4. 重新部署 Rime（鼠须管、小狼毫在输入法菜单中选择"重新部署"）。
-
-下载与覆盖可交给自动更新脚本完成，见下文["自动增量更新"](#自动增量更新)。
-
-## 自动增量更新
-
-`updater/` 目录提供三种平台的客户端脚本，已安装 FuyaoRime 的机器每日自动下载增量包并重新部署：
-
-| 平台 | 客户端 | 脚本 | Rime 配置目录 |
-| :--- | :--- | :--- | :--- |
-| macOS | 鼠须管（Squirrel） | `fuyaorime-update-macos.sh` | `~/Library/Rime/` |
-| Windows | 小狼毫（Weasel） | `fuyaorime-update-windows.ps1` | `%APPDATA%\Rime\` |
-| Linux | ibus-rime / fcitx5-rime | `fuyaorime-update-linux.sh` | `~/.config/rime/` |
-
-脚本行为：
-
-1. 首次运行没有本地版本标记（配置目录下的 `fuyaorime-version.txt`），下载全量包安装；
-2. 之后每日运行只下载增量包，相隔多天时按发布链逐个应用；
-3. 增量链中断（某日增量包缺失，或本地版本早于最近一百个 release）时自动回退全量包，不跳版漏文件；
-4. 增量包 `INCREMENTAL-README.txt` 中的删除清单会被解析，对应文件自动清理；
-5. 更新完成后自动重新部署：鼠须管 `--reload`，小狼毫 `WeaselDeployer /deploy`，Linux 重启 ibus 或 fcitx5。
-
-### 安装与运行
-
-macOS（Linux 相同，换用对应脚本）：
+依赖系统自带的 Bash、`curl` 和 `unzip`，重新部署使用鼠须管的 `--reload`。
 
 ```bash
-curl -fsSL -o ~/bin/fuyaorime-update-macos.sh \
+mkdir -p "$HOME/bin" "$HOME/Library/Logs"
+curl -fsSL -o "$HOME/bin/fuyaorime-update-macos.sh" \
   https://raw.githubusercontent.com/skyrocketingHong/FuyaoRime/main/updater/fuyaorime-update-macos.sh
-chmod +x ~/bin/fuyaorime-update-macos.sh
-~/bin/fuyaorime-update-macos.sh
+bash "$HOME/bin/fuyaorime-update-macos.sh"
 ```
 
-Windows（PowerShell）：
+### Linux
+
+需要 Bash、`curl` 和 `unzip`。脚本会尝试重启正在运行的 fcitx5，或执行 `ibus restart`。
+
+```bash
+mkdir -p "$HOME/bin" "$HOME/.local/state"
+curl -fsSL -o "$HOME/bin/fuyaorime-update-linux.sh" \
+  https://raw.githubusercontent.com/skyrocketingHong/FuyaoRime/main/updater/fuyaorime-update-linux.sh
+bash "$HOME/bin/fuyaorime-update-linux.sh"
+```
+
+配置目录不同时，将实际路径作为第一个参数传入：
+
+```bash
+bash "$HOME/bin/fuyaorime-update-linux.sh" "/path/to/rime"
+```
+
+macOS 脚本接受相同参数。Linux 定时任务缺少图形会话环境时，可能需要在更新后手动重新部署。
+
+### Windows
+
+使用 Windows PowerShell 5.1 或更高版本。脚本会在 Rime 安装目录中查找 `WeaselDeployer.exe` 并执行 `/deploy`；找不到时会提示手动部署。
 
 ```powershell
 Invoke-WebRequest -UseBasicParsing `
   -Uri https://raw.githubusercontent.com/skyrocketingHong/FuyaoRime/main/updater/fuyaorime-update-windows.ps1 `
   -OutFile "$env:USERPROFILE\fuyaorime-update-windows.ps1"
-powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\fuyaorime-update-windows.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\fuyaorime-update-windows.ps1"
 ```
 
-### 每日定时（示例为 06:30）
+自定义目录可通过 `-RimeDir 'D:\Rime'` 传入。更新脚本不包含在配置包中，需要升级脚本时重新执行对应平台的下载命令。
 
-macOS 与 Linux（`crontab -e`，日志路径按需调整）：
+### 每日定时
 
-```bash
-30 6 * * * /bin/bash ~/bin/fuyaorime-update-macos.sh >> ~/Library/Logs/fuyaorime-update.log 2>&1
-30 6 * * * /bin/bash ~/bin/fuyaorime-update-linux.sh >> ~/.local/share/fuyaorime-update.log 2>&1
+以下示例按本机时区在 06:30 运行。先手动执行一次脚本，确认日志中的安装结果与版本标记，再添加定时任务。
+
+macOS：执行 `crontab -e`，添加一行：
+
+```cron
+30 6 * * * /bin/bash "$HOME/bin/fuyaorime-update-macos.sh" >> "$HOME/Library/Logs/fuyaorime-update.log" 2>&1
 ```
 
-Windows（任务计划程序）：
+Linux：执行 `crontab -e`，添加一行，配置目录不同时在命令后补充实际路径：
+
+```cron
+30 6 * * * /bin/bash "$HOME/bin/fuyaorime-update-linux.sh" >> "$HOME/.local/state/fuyaorime-update.log" 2>&1
+```
+
+Windows：在命令提示符中创建任务：
 
 ```bat
 schtasks /Create /SC DAILY /ST 06:30 /TN "FuyaoRime Update" ^
-  /TR "powershell -ExecutionPolicy Bypass -File \"%USERPROFILE%\fuyaorime-update-windows.ps1\""
+  /TR "powershell -NoProfile -ExecutionPolicy Bypass -File \"%USERPROFILE%\fuyaorime-update-windows.ps1\""
 ```
 
-说明：
+停用时删除对应的 crontab 行，或执行 `schtasks /Delete /TN "FuyaoRime Update" /F`。下载失败时检查网络与 GitHub API 限额；可设置 `GITHUB_TOKEN` 提高 API 请求限额。
 
-- 依赖 `curl` 与 `unzip`，macOS 自带，Linux 缺失时用发行版包管理器安装；
-- 查询 release 列表走 GitHub 匿名 API（限额 60 次/小时），每日一次远低于限额；
-- Linux 定时任务没有图形会话时可能无法自动重启输入法，日志会给出提示，届时手动重新部署即可；
-- 脚本只覆盖配置包内的文件并清理删除清单，不触碰 `*.userdb` 等用户数据；需要彻底恢复时重新解压全量包即可。
+## 输入方案与词库
 
-### 方法二：手动同步
+| 输入方案 | `schema_id` | 默认状态 |
+| :--- | :--- | :--- |
+| 雾凇拼音（全拼） | `rime_ice` | 启用 |
+| 自然码双拼 | `double_pinyin` | 启用 |
+| 智能 ABC 双拼 | `double_pinyin_abc` | 启用 |
+| 微软双拼 | `double_pinyin_mspy` | 启用 |
+| 搜狗双拼 | `double_pinyin_sogou` | 启用 |
+| 小鹤双拼 | `double_pinyin_flypy` | 启用 |
+| 紫光双拼 | `double_pinyin_ziguang` | 启用 |
+| 拼音加加双拼 | `double_pinyin_jiajia` | 启用 |
+| 中文九键 | `t9` | 注释，按需启用 |
+| 部件拆字 | `radical_pinyin` | 作为反查与辅码使用 |
+| Easy English Nano | `melt_eng` | 作为英文次翻译器使用 |
+
+配置包包含雾凇拼音的中文词库、英文及中英混合词库、OpenCC 映射和 Lua 扩展。额外词库包括中文维基百科、维基文库、维基词典、萌娘百科、网络俚语、中国地名、流行新词、中文人名、成语俗语、古诗词名句和唐诗三百首。
+
+语言模型、额外词库和模糊音默认仅作用于全拼；双拼保持上游配置。英文方案另有三字母全小写派生补丁，例如输入 `ios` 可匹配 `iOS`，全拼和双拼均可使用。
+
+标点按全角映射处理，包括数字和字母后的标点。输入网址、邮箱或代码时可切换英文模式。
+
+## 自定义配置
+
+在仓库中修改以下文件后重新合并配置；直接修改已安装配置时，使用配置目录下对应的文件名。
+
+| 配置项 | 源文件 |
+| :--- | :--- |
+| 启用方案、标点规则 | [`overlay/default.custom.yaml`](overlay/default.custom.yaml) |
+| 全拼语言模型、模糊音及其他设置 | [`overlay/rime_ice.custom.yaml`](overlay/rime_ice.custom.yaml) |
+| 额外词库引用 | [`overlay/rime_ice.custom.dict.yaml`](overlay/rime_ice.custom.dict.yaml) |
+| 英文拼写派生 | [`overlay/melt_eng.custom.yaml`](overlay/melt_eng.custom.yaml) |
+| macOS 皮肤 | [`overlay/squirrel.custom.yaml`](overlay/squirrel.custom.yaml) |
+| Windows 皮肤 | [`overlay/weasel.custom.yaml`](overlay/weasel.custom.yaml) |
+
+添加词库时，将 `.dict.yaml` 文件放入 `custom_dicts/`，并在 `rime_ice.custom.dict.yaml` 的 `import_tables` 中添加引用。定制其他方案时新增对应的 `<schema_id>.custom.yaml`，不要直接复制全拼的模糊音拼写规则到双拼方案。
+
+## 同步与构建
+
+[`sync.yml`](.github/workflows/sync.yml) 每日同步雾凇拼音、万象语言模型和额外词库，再叠加 `overlay/` 生成配置包。维基百科、维基文库和维基词典另按月从 Wikimedia 标题数据构建，网络俚语每日检查页面变化。同步也可在 [Actions](https://github.com/skyrocketingHong/FuyaoRime/actions/workflows/sync.yml) 中手动触发。
+
+<details>
+<summary>手动构建配置包</summary>
+
+在已有 Python 环境中安装脚本依赖后运行：
 
 ```bash
-# 克隆本仓库
 git clone https://github.com/skyrocketingHong/FuyaoRime.git
 cd FuyaoRime
-
-# 克隆雾凇拼音上游
 git clone --depth 1 https://github.com/iDvel/rime-ice.git upstream/rime-ice
 
-# 下载万象拼音语言模型
 mkdir -p upstream/wanxiang
-curl -L -o upstream/wanxiang/wanxiang-lts-zh-hans.gram \
-  "https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hans.gram"
+curl -fL -o upstream/wanxiang/wanxiang-lts-zh-hans.gram \
+  https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hans.gram
 
-# 更新额外词库
+python3 -m pip install pypinyin opencc regex more-itertools
 python3 scripts/update_dicts.py
-
-# （可选）从维基媒体 dump 自建 zhwiki 系词库，依赖 opencc、regex、more-itertools
 python3 scripts/build_zhwiki.py
-
-# 合并配置
 bash scripts/merge.sh
-
-# 复制到 Rime 配置目录（以 macOS 为例）
-cp -r output/* ~/Library/Rime/
 ```
 
-## 目录结构
+合并结果位于 `output/`。复制到客户端配置目录后重新部署；自行构建的配置没有 Release 版本基线，接入自动更新时应删除旧的 `fuyaorime-version.txt`。
+
+</details>
+
+主要目录：
 
 ```text
 FuyaoRime/
-├── .github/workflows/sync.yml    # 自动同步工作流
-├── custom_dicts/                 # 额外词库，由 update_dicts.py 生成与更新
-├── overlay/                      # 自定义配置，合并时叠加到上游文件
-│   ├── default.custom.yaml       # 方案列表
-│   ├── melt_eng.custom.yaml      # 英文方案补丁（三字母全小写派生）
-│   ├── rime_ice.custom.yaml      # 全拼方案定制（语言模型、模糊音等）
-│   ├── rime_ice.custom.dict.yaml # 自定义词库挂载
-│   ├── squirrel.custom.yaml      # macOS 皮肤
-│   └── weasel.custom.yaml        # Windows 皮肤
-├── scripts/
-│   ├── build_zhwiki.py           # 从维基媒体 dump 自建 zhwiki 系词库
-│   ├── make_diff_package.py      # 生成相对上一版的增量更新包
-│   ├── merge.sh                  # 合并脚本
-│   ├── update_dicts.py           # 额外词库更新脚本
-│   ├── .rime_ice_hash            # 上游 commit 记录
-│   └── .zhwiki_build_rules       # zhwiki 构建规则版本
-├── updater/
-│   ├── fuyaorime-update-linux.sh     # Linux 客户端自动增量更新
-│   ├── fuyaorime-update-macos.sh     # macOS 客户端自动增量更新
-│   └── fuyaorime-update-windows.ps1  # Windows 客户端自动增量更新
-├── AGENTS.md                     # 项目约定
-├── LICENSE                       # GPL-3.0 许可证
-└── README.md
+├── .github/workflows/sync.yml   # 每日同步与发布
+├── overlay/                    # 自定义配置和皮肤
+├── scripts/                    # 词库获取、生成、合并及增量打包
+├── updater/                    # 三平台客户端更新脚本
+├── tests/                      # 更新逻辑的离线回归测试
+├── custom_dicts/               # 构建时生成的额外词库
+├── upstream/                   # 构建时下载的上游文件
+└── output/                     # 合并后的配置
 ```
 
-## 自动同步
+## 使用与反馈
 
-仓库配置了 GitHub Actions，每日北京时间 05:00 自动执行：
+本仓库为作者个人使用的输入法配置，不接受功能建议与定制请求；问题反馈限于可复现的同步失败或配置错误。
 
-1. 拉取雾凇拼音最新版本；
-2. 下载万象拼音语言模型；
-3. 更新额外词库（维基系词库取上游 release 中日期最新的文件）；
-4. 每日运行 build_zhwiki.py：三库跟进维基媒体每月 1 日的 dump 新批次（就绪时间不固定，未就绪则每日重试，同一批次按日期去重不重复构建），web-slang 每日快照《中国大陆网络用语列表》页面、内容无变化不更新；
-5. 合并所有文件，保留全部输入方案与自定义配置；
-6. 生成全量包 `fuyaorime-*.zip` 与相对上一版的增量包 `*-diff-from-*.zip`，发布到 Releases。
+## 致谢与许可
 
-也可以在 [Actions](https://github.com/skyrocketingHong/FuyaoRime/actions/workflows/sync.yml) 页面手动触发。
+- [iDvel/rime-ice](https://github.com/iDvel/rime-ice)：雾凇拼音配置与词库。
+- [amzxyz/rime_wanxiang](https://github.com/amzxyz/rime_wanxiang) 和 [amzxyz/RIME-LMDG](https://github.com/amzxyz/RIME-LMDG)：万象拼音与语言模型。
+- [felixonmars/fcitx5-pinyin-zhwiki](https://github.com/felixonmars/fcitx5-pinyin-zhwiki) 和 [Wikimedia Dumps](https://dumps.wikimedia.org/)：维基系词库与条目标题数据。
+- [outloudvi/mw2fcitx](https://github.com/outloudvi/mw2fcitx)：萌娘百科词库。
+- [搜狗词库](https://pinyin.sogou.com)和[深蓝词库转换工具](https://github.com/studyzy/imewlconverter)：分类词库及格式转换。
+- [wainshine/Chinese-Names-Corpus](https://github.com/wainshine/Chinese-Names-Corpus) 和 [pypinyin](https://github.com/mozillazg/pypinyin)：中文人名语料与拼音标注。
 
-## 自定义
-
-### 修改皮肤
-
-编辑 `overlay/squirrel.custom.yaml`（macOS）或 `overlay/weasel.custom.yaml`（Windows）。内置薄荷绿与柑橘黄两套皮肤（各含明暗变体），可在输入法外观设置中切换。
-
-### 添加词库
-
-1. 将词库文件（`.dict.yaml`）放入 `custom_dicts/` 目录；
-2. 在 `overlay/rime_ice.custom.dict.yaml` 的 `import_tables` 中添加引用。
-
-### 修改方案配置
-
-全拼方案编辑 `overlay/rime_ice.custom.yaml`；其他方案按相同写法新增 `overlay/<schema_id>.custom.yaml`。
-
-### 标点行为
-
-已关闭"数字、字母后标点自动半角"，标点一律按全角映射处理：数字后的逗号、句号、冒号不再作为数字分隔符（`3.14`、`1,000` 不会整体上屏）；`www.`、`https:` 等前缀与 `abc_`、`name@site` 等写法中的标点也不再保持半角。输入网址、邮箱或代码标识符时，可按 Shift 临时切换英文模式。相关补丁位于 `overlay/default.custom.yaml`（`punctuator/digit_separators` 与 `recognizer/patterns`）。
-
-## 致谢
-
-- [iDvel/rime-ice](https://github.com/iDvel/rime-ice)：雾凇拼音
-- [amzxyz/rime_wanxiang](https://github.com/amzxyz/rime_wanxiang)：万象拼音
-- [amzxyz/RIME-LMDG](https://github.com/amzxyz/RIME-LMDG)：万象拼音语言模型发布仓库
-- [felixonmars/fcitx5-pinyin-zhwiki](https://github.com/felixonmars/fcitx5-pinyin-zhwiki)：维基百科、维基文库、维基词典、网络俚语词库
-- [Wikimedia Dumps](https://dumps.wikimedia.org/)：维基媒体条目标题 dump（zhwiki 系词库每周自建的数据源）
-- [outloudvi/mw2fcitx](https://github.com/outloudvi/mw2fcitx)：萌娘百科词库
-- [搜狗词库](https://pinyin.sogou.com)：中国地名、流行新词、成语俗语、古诗词名句、唐诗三百首词库
-- [studyzy/imewlconverter](https://github.com/studyzy/imewlconverter)：深蓝词库转换工具
-- [wainshine/Chinese-Names-Corpus](https://github.com/wainshine/Chinese-Names-Corpus)：中文人名语料库
-- [pypinyin](https://github.com/mozillazg/pypinyin)：人名词库拼音标注
-
-## 许可
-
-本仓库再分发 [雾凇拼音](https://github.com/iDvel/rime-ice) 的配置与词库，整体遵循 [GPL-3.0](LICENSE) 许可证，与上游一致。
+本仓库再分发雾凇拼音的配置与词库，整体遵循 [GPL-3.0](LICENSE) 许可证。
 
 ## AI 辅助开发
 
