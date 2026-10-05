@@ -46,9 +46,20 @@ trap 'rm -rf "$WORK_DIR"' EXIT
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
 fetch() {
-    local url="$1"
-    if [ -n "$GITHUB_PROXY" ]; then url="$GITHUB_PROXY/$url"; fi
-    curl -fsSL --retry 2 --connect-timeout 15 -o "$2" "$url"
+    local url="$1" name="${1##*/}" route="直连" status
+    if [ -n "$GITHUB_PROXY" ]; then
+        url="$GITHUB_PROXY/$url"
+        route="代理转发"
+    fi
+    log "开始下载 ${name}（${route}），下方显示下载量、速度和预计剩余时间"
+    if curl --no-silent -fL --retry 2 --connect-timeout 15 \
+            --speed-limit 1 --speed-time 60 -o "$2" "$url"; then
+        log "下载完成 ${name}"
+    else
+        status=$?
+        log "下载失败 ${name}（curl 退出码 ${status}）"
+        return "$status"
+    fi
 }
 
 # 公开 Release 跳转不依赖 REST API 的匿名请求额度。
@@ -67,6 +78,7 @@ latest_version() {
 
 validate_diff() {
     local version
+    log "正在校验增量包和适用版本"
     unzip -tq "$1" >/dev/null 2>&1 || return 1
     version=$(unzip -p "$1" INCREMENTAL-README.txt 2>/dev/null \
         | tr -d '\r' | sed -n '/^适用版本:/p') || return 1
@@ -99,6 +111,7 @@ assert_safe_target() {
 
 extract_package() {
     local path
+    log "正在检查配置包路径"
     unzip -Z1 "$1" > "$WORK_DIR/package-files.txt"
     while IFS= read -r path; do
         is_protected_path "$path" && continue
@@ -107,6 +120,7 @@ extract_package() {
     unzip -Z -l "$1" | awk '$1 ~ /^l/ {link=1} END {exit link ? 1 : 0}' \
         || { log "配置包包含符号链接，已停止"; return 1; }
     # 在解压阶段排除用户数据，不能覆盖后再用可能过期的数据库备份恢复。
+    log "正在解压并更新配置，保留安装信息和用户数据库"
     rm -f "$MARKER"
     unzip -oq -C "$1" -d "$RIME_DIR" -x \
         'installation.yaml' '*/installation.yaml' 'installation.yaml/*' '*/installation.yaml/*' \
@@ -134,6 +148,7 @@ apply_diff() {
 install_full() {
     fetch "https://github.com/$REPO/releases/download/v$latest/fuyaorime-$latest.zip" \
         "$WORK_DIR/full.zip" || { log "全量包下载失败"; exit 1; }
+    log "正在校验全量包"
     unzip -tq "$WORK_DIR/full.zip" >/dev/null 2>&1 || { log "全量包校验失败"; exit 1; }
     extract_package "$WORK_DIR/full.zip"
     log "已应用全量包 $latest"
@@ -154,6 +169,7 @@ redeploy() {
 
 main() {
     local latest current
+    log "正在查询最新 Release 版本"
     latest=$(latest_version) || { log "获取最新 Release 版本失败，请检查 GitHub 连接"; exit 1; }
 
     mkdir -p "$RIME_DIR"

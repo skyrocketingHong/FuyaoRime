@@ -60,13 +60,15 @@ FuyaoRime 将[雾凇拼音](https://github.com/iDvel/rime-ice)的配置与词库
 
 桌面脚本会跳过 `installation.yaml`、`userdb` 和所有 `*.userdb` 数据库及其内部文件，更新包覆盖与增量删除清单均不能修改这些路径；其他目录也不会因删除清单而被整目录删除。此保护针对更新器的文件操作，输入法重新部署时仍按自身规则处理用户数据。
 
+macOS 和 Linux 下载时显示 curl 的下载量、速度和预计剩余时间；Windows 使用 PowerShell 原生下载进度。所有桌面脚本都会提示查询版本、开始下载、下载完成、校验和解压等阶段。服务器未提供总大小时，百分比或剩余时间可能不可用。macOS 和 Linux 连续 60 秒传输速度低于 1 字节每秒时会中止本次下载，并按 curl 的重试规则最多重试两次。
+
 ### macOS
 
 依赖系统自带的 Bash、`curl` 和 `unzip`，重新部署使用鼠须管的 `--reload`。
 
 ```bash
 mkdir -p "$HOME/bin" "$HOME/Library/Logs"
-curl -fsSL -o "$HOME/bin/fuyaorime-update-macos.sh" \
+curl -fL -o "$HOME/bin/fuyaorime-update-macos.sh" \
   https://raw.githubusercontent.com/skyrocketingHong/FuyaoRime/main/updater/fuyaorime-update-macos.sh
 bash "$HOME/bin/fuyaorime-update-macos.sh"
 ```
@@ -77,7 +79,7 @@ bash "$HOME/bin/fuyaorime-update-macos.sh"
 
 ```bash
 mkdir -p "$HOME/bin" "$HOME/.local/state"
-curl -fsSL -o "$HOME/bin/fuyaorime-update-linux.sh" \
+curl -fL -o "$HOME/bin/fuyaorime-update-linux.sh" \
   https://raw.githubusercontent.com/skyrocketingHong/FuyaoRime/main/updater/fuyaorime-update-linux.sh
 bash "$HOME/bin/fuyaorime-update-linux.sh"
 ```

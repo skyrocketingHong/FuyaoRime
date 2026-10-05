@@ -47,8 +47,22 @@ function Get-LatestVersion {
 }
 
 function Save-Asset([string]$Url, [string]$Dest) {
-    if ($GitHubProxy) { $Url = "$GitHubProxy/$Url" }
-    Invoke-WebRequest -Uri $Url -OutFile $Dest -UseBasicParsing
+    $name = ($Url -split '/')[-1]
+    $route = '直连'
+    if ($GitHubProxy) {
+        $Url = "$GitHubProxy/$Url"
+        $route = '代理转发'
+    }
+    # 仅在下载函数内开启原生进度，不修改用户会话的全局偏好。
+    $ProgressPreference = 'Continue'
+    Write-Log "开始下载 ${name}（${route}），下方显示 PowerShell 下载进度"
+    try {
+        Invoke-WebRequest -Uri $Url -OutFile $Dest -UseBasicParsing
+        Write-Log "下载完成 ${name}"
+    } catch {
+        Write-Log "下载失败 ${name}"
+        throw
+    }
 }
 
 function Test-DiffVersion([string]$ReadmePath, [string]$FromVersion, [string]$ToVersion) {
@@ -137,6 +151,7 @@ function Invoke-Redeploy {
 }
 
 function Update-FuyaoRime {
+    Write-Log '正在查询最新 Release 版本'
     $latest = Get-LatestVersion
 
     New-Item -ItemType Directory -Path $RimeDir -Force | Out-Null
@@ -159,6 +174,7 @@ function Update-FuyaoRime {
             try {
                 $zip = Join-Path $workDir 'diff.zip'
                 Save-Asset "https://github.com/$Repo/releases/download/v$latest/fuyaorime-$latest-diff-from-$current.zip" $zip
+                Write-Log '正在解压并校验增量包'
                 Expand-Archive -Path $zip -DestinationPath $packageDir -Force
                 $useDiff = Test-DiffVersion (Join-Path $packageDir 'INCREMENTAL-README.txt') $current $latest
             } catch {
@@ -177,10 +193,12 @@ function Update-FuyaoRime {
             }
             $zip = Join-Path $workDir 'full.zip'
             Save-Asset "https://github.com/$Repo/releases/download/v$latest/fuyaorime-$latest.zip" $zip
+            Write-Log '正在解压并校验全量包'
             Expand-Archive -Path $zip -DestinationPath $packageDir -Force
         }
 
         # 写入中断后无法再信任旧基线，下次运行须使用全量包。
+        Write-Log '正在更新配置，保留安装信息和用户数据库'
         if (Test-Path -LiteralPath $Marker) { Remove-Item -LiteralPath $Marker -Force }
         Copy-PackageFiles $packageDir
         if ($useDiff) {
