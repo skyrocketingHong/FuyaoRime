@@ -13,6 +13,24 @@ from urllib.parse import quote
 REPOSITORY = 'https://github.com/skyrocketingHong/FuyaoRime'
 ICE = 'https://github.com/iDvel/rime-ice/blob/main/'
 RADICAL = 'https://github.com/mirtlecn/rime-radical-pinyin'
+ICE_LABELS = {
+    'cn_dicts/41448.dict.yaml': '扩展字表（41448）',
+    'cn_dicts/8105.dict.yaml': '通用规范汉字表（8105）',
+    'cn_dicts/base.dict.yaml': '雾凇基础词库',
+    'cn_dicts/ext.dict.yaml': '雾凇扩展词库',
+    'cn_dicts/others.dict.yaml': '雾凇补充词库',
+    'cn_dicts/tencent.dict.yaml': '腾讯词库',
+    'en_dicts/en.dict.yaml': '英文基础词库',
+    'en_dicts/en_ext.dict.yaml': '英文扩展词库',
+    'en_dicts/cn_en.txt': '中英混输（全拼）',
+    'en_dicts/cn_en_abc.txt': '中英混输（智能 ABC）',
+    'en_dicts/cn_en_double_pinyin.txt': '中英混输（自然码）',
+    'en_dicts/cn_en_flypy.txt': '中英混输（小鹤）',
+    'en_dicts/cn_en_jiajia.txt': '中英混输（拼音加加）',
+    'en_dicts/cn_en_mspy.txt': '中英混输（微软）',
+    'en_dicts/cn_en_sogou.txt': '中英混输（搜狗）',
+    'en_dicts/cn_en_ziguang.txt': '中英混输（紫光）',
+}
 EXTRA_SOURCES = {
     'zhwiki': ('维基百科', 'https://dumps.wikimedia.org/zhwiki/'),
     'zhwikisource': ('维基文库', 'https://dumps.wikimedia.org/zhwikisource/'),
@@ -52,8 +70,7 @@ def previous_release(releases, current):
 
 def dictionary_version(path):
     with path.open(encoding='utf-8-sig') as handle:
-        for _ in range(80):
-            line = handle.readline()
+        for line in handle:
             if not line or line.strip() == '...':
                 break
             match = re.match(r'^version:\s*(.+?)\s*$', line)
@@ -68,10 +85,10 @@ def source_rows(output):
     for folder in ('cn_dicts', 'en_dicts'):
         for path in sorted((output / folder).glob('*.dict.yaml')):
             relative = path.relative_to(output).as_posix()
-            rows.append((relative, ICE + relative, dictionary_version(path)))
+            rows.append((ICE_LABELS.get(relative, relative), ICE + relative, dictionary_version(path)))
     for path in sorted((output / 'en_dicts').glob('cn_en*.txt')):
         relative = path.relative_to(output).as_posix()
-        rows.append((relative, ICE + relative, '随雾凇同步'))
+        rows.append((ICE_LABELS.get(relative, relative), ICE + relative, '随雾凇同步'))
     for path in sorted((output / 'custom_dicts').glob('*.dict.yaml')):
         key = path.name.removesuffix('.dict.yaml')
         if key not in EXTRA_SOURCES:

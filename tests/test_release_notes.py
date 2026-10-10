@@ -80,6 +80,12 @@ class ReleaseNotesTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             NOTES.render(Path('.'), '20261010-v2', {'from': '20261009', 'to': '20261010'})
 
+    def test_version_can_follow_a_long_dictionary_header(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'base.dict.yaml'
+            path.write_text('# source notes\n' * 3300 + '---\nversion: "2026-09-20"\n...\n')
+            self.assertEqual(NOTES.dictionary_version(path), '2026-09-20')
+
 
 if __name__ == '__main__':
     unittest.main()
