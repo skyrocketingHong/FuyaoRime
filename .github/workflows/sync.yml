@@ -53,6 +53,9 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/iDvel/rime-ice.git upstream/rime-ice
 
+      - name: Download tone-marked radical readings
+        run: python3 scripts/fetch_radical_readings.py
+
       - name: Download wanxiang grammar
         run: |
           mkdir -p upstream/wanxiang
@@ -183,6 +186,7 @@ jobs:
           echo "- 雾凇拼音最新词库" >> release_notes.md
           echo "- 万象拼音语言模型" >> release_notes.md
           echo "- 自定义词库（维基百科、萌娘百科等）" >> release_notes.md
+          echo "- 全拼无前缀拆字混输与带声调注音，保留 uU 反查入口" >> release_notes.md
           echo "- 自定义皮肤和配置" >> release_notes.md
           echo "" >> release_notes.md
 

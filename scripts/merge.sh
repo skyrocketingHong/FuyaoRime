@@ -9,6 +9,13 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 UPSTREAM_DIR="$PROJECT_DIR/upstream/rime-ice"
 OVERLAY_DIR="$PROJECT_DIR/overlay"
 OUTPUT_DIR="$PROJECT_DIR/output"
+READINGS_FILE="$PROJECT_DIR/upstream/radical-readings/zdict.reverse.bin"
+
+# 注音是全拼拆字功能的必要资源，缺失时不能发布不完整的配置包。
+if [ ! -s "$READINGS_FILE" ]; then
+    echo "缺少带调注音资源，请先运行 python3 scripts/fetch_radical_readings.py" >&2
+    exit 1
+fi
 
 echo "=== 开始合并 Rime 配置 ==="
 
@@ -85,6 +92,10 @@ rm -f "$OUTPUT_DIR/go.work"
 rm -rf "$OUTPUT_DIR/.github"
 rm -rf "$OUTPUT_DIR/build"
 rm -rf "$OUTPUT_DIR/others/script"
+
+# build 目录清理后仅放入专门下载的注音词典，不混入本机编译缓存。
+mkdir -p "$OUTPUT_DIR/build"
+cp "$READINGS_FILE" "$OUTPUT_DIR/build/zdict.reverse.bin"
 
 echo ""
 echo "=== 合并完成 ==="

@@ -12,6 +12,18 @@ patch:
   "translator/dictionary": rime_ice.custom # 挂载词库 rime_ice.custom.dict.yaml
   "reduce_english_filter/mode": all # all | custom | none
   "radical_reverse_lookup/dictionary": zdict
+  # 完整拆字匹配插入第 4 位起；保留上游 uU 反查入口。
+  "engine/filters/+":
+    - lua_filter@*fuyao_radical
+  fuyao_radical:
+    tag: abc
+    dictionary: radical_pinyin
+    prism: radical_pinyin
+    enable_completion: false
+    enable_sentence: false
+    enable_user_dict: false
+    insert_after: 3
+    max_candidates: 2
   ascii_composer:
     good_old_caps_lock: true # true | false
     switch_key:

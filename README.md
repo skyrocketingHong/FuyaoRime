@@ -14,6 +14,7 @@ FuyaoRime 将[雾凇拼音](https://github.com/iDvel/rime-ice)的配置与词库
 
 - 保留雾凇拼音的全拼、七种双拼、九键、部件拆字与英文方案。
 - 为全拼配置万象语言模型、额外词库和模糊音。
+- 全拼支持无前缀拆字混输，并为拆字候选显示带声调拼音；保留 `uU` 反查入口。
 - 提供 macOS 与 Windows 的薄荷绿、柑橘黄皮肤，均含明暗变体。
 - 每日计划于北京时间 05:00 触发同步，完成后发布全量包和增量包；GitHub Actions 的实际运行与发布时间可能延迟。
 
@@ -165,6 +166,24 @@ schtasks /Create /SC DAILY /ST 09:00 /TN "FuyaoRime Update" ^
 
 语言模型、额外词库和模糊音默认仅作用于全拼；双拼保持上游配置。英文方案另有三字母全小写派生补丁，例如输入 `ios` 可匹配 `iOS`，全拼和双拼均可使用。
 
+### 全拼拆字混输
+
+使用雾凇拼音全拼时，直接输入各部件的拼音即可在普通候选中找到对应汉字，无需切换方案或输入前缀。
+
+| 输入 | 拆字候选示例 |
+| :--- | :--- |
+| `mamama` | 骉、驫，附带 `biāo` 等词典收录读音 |
+| `huohuohuo` | 焱，附带 `yàn` |
+| `shuishuishui` | 淼，附带 `miǎo` |
+| `mumumu` | 森，附带 `sēn` |
+| `jinjinjin` | 鑫，附带 `xīn` |
+
+普通候选的前三项优先保留，之后插入最多两个拆字候选；普通候选不足三项时接在现有候选之后。同码结果优先选用有注音的汉字，再优先选用基本汉字区字形。仅匹配完整的多部件编码，不做拆字补全或造句，不为拆字编码启用用户词频学习。显式分隔写法如 `ma'ma'ma` 也可使用；相同候选只显示一次。
+
+原有 `uU` 反查入口继续可用，例如 `uUmamama`，并共用带声调注音。注音来自部件拆字项目提供的汉典反查词典，读音以该词典收录为准；没有收录读音的无前缀候选仅标注“拆字”。这项扩展只挂载到全拼，双拼方案保持不变。
+
+配置包包含 `build/zdict.reverse.bin`，首次安装也无需额外下载注音词典。覆盖配置后需要重新部署；注音的颜色、字号及是否显示由客户端和皮肤决定。
+
 标点按全角映射处理，包括数字和字母后的标点。输入网址、邮箱或代码时可切换英文模式。
 
 ## 自定义配置
@@ -177,6 +196,7 @@ schtasks /Create /SC DAILY /ST 09:00 /TN "FuyaoRime Update" ^
 | 全拼语言模型、模糊音及其他设置 | [`overlay/rime_ice.custom.yaml`](overlay/rime_ice.custom.yaml) |
 | 额外词库引用 | [`overlay/rime_ice.custom.dict.yaml`](overlay/rime_ice.custom.dict.yaml) |
 | 英文拼写派生 | [`overlay/melt_eng.custom.yaml`](overlay/melt_eng.custom.yaml) |
+| 全拼拆字混输实现 | [`overlay/lua/fuyao_radical.lua`](overlay/lua/fuyao_radical.lua) |
 | macOS 皮肤 | [`overlay/squirrel.custom.yaml`](overlay/squirrel.custom.yaml) |
 | Windows 皮肤 | [`overlay/weasel.custom.yaml`](overlay/weasel.custom.yaml) |
 
@@ -197,6 +217,7 @@ schtasks /Create /SC DAILY /ST 09:00 /TN "FuyaoRime Update" ^
 git clone https://github.com/skyrocketingHong/FuyaoRime.git
 cd FuyaoRime
 git clone --depth 1 https://github.com/iDvel/rime-ice.git upstream/rime-ice
+python3 scripts/fetch_radical_readings.py
 
 mkdir -p upstream/wanxiang
 curl -fL -o upstream/wanxiang/wanxiang-lts-zh-hans.gram \
@@ -210,6 +231,10 @@ bash scripts/merge.sh
 
 合并结果位于 `output/`。复制到客户端配置目录后重新部署；自行构建的配置没有 Release 版本基线，接入自动更新时应删除旧的 `fuyaorime-version.txt`。
 
+`fetch_radical_readings.py` 从部件拆字项目的 `extra.zip` 读取带调注音文件，写入被 Git 忽略的 `upstream/radical-readings/`。下载或校验失败会中止构建；`merge.sh` 在清理旧构建缓存后将该文件加入配置包的 `build/` 目录。已有下载文件时可使用 `python3 scripts/fetch_radical_readings.py --archive /path/to/extra.zip`。
+
+拆字资源与合并流程的离线检查可运行 `python3 -m unittest discover -s tests -p 'test_radical_readings.py' -v`。真实引擎测试位于 `tests/test_radical_engine.py`，需安装 PyYAML，并用 Rime 的公开头文件编译 `tests/rime_probe.cc`，通过 `RIME_PROBE`、`RIME_LIBRARY`、`RIME_LUA_PLUGIN` 指定探针、引擎动态库和 Lua 插件路径；未提供运行时会明确跳过。测试使用上游拆字数据和临时合成词库，不读取个人词频数据库，不能代替 iPhone 端验证。
+
 </details>
 
 主要目录：
@@ -220,7 +245,7 @@ FuyaoRime/
 ├── overlay/                    # 自定义配置和皮肤
 ├── scripts/                    # 词库获取、生成、合并及增量打包
 ├── updater/                    # 三平台客户端更新脚本
-├── tests/                      # 更新逻辑的离线回归测试
+├── tests/                      # 更新逻辑、注音资源与 Rime 引擎回归测试
 ├── custom_dicts/               # 构建时生成的额外词库
 ├── upstream/                   # 构建时下载的上游文件
 └── output/                     # 合并后的配置
@@ -233,6 +258,7 @@ FuyaoRime/
 ## 致谢与许可
 
 - [iDvel/rime-ice](https://github.com/iDvel/rime-ice)：雾凇拼音配置与词库。
+- [mirtlecn/rime-radical-pinyin](https://github.com/mirtlecn/rime-radical-pinyin)：部件拆字词库与带声调反查注音资源。
 - [amzxyz/rime_wanxiang](https://github.com/amzxyz/rime_wanxiang) 和 [amzxyz/RIME-LMDG](https://github.com/amzxyz/RIME-LMDG)：万象拼音与语言模型。
 - [felixonmars/fcitx5-pinyin-zhwiki](https://github.com/felixonmars/fcitx5-pinyin-zhwiki) 和 [Wikimedia Dumps](https://dumps.wikimedia.org/)：维基系词库与条目标题数据。
 - [outloudvi/mw2fcitx](https://github.com/outloudvi/mw2fcitx)：萌娘百科词库。
