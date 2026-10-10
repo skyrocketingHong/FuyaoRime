@@ -27,6 +27,8 @@ FuyaoRime 将[雾凇拼音](https://github.com/iDvel/rime-ice)的配置与词库
 | `fuyaorime-YYYYMMDD.zip` | 全量包。首次安装、跨版更新或无法确认本地版本时使用 |
 | `fuyaorime-YYYYMMDD-diff-from-YYYYMMDD.zip` | 增量包。仅适用于已安装版本与 `from` 后日期完全一致的配置 |
 
+同一天再次发布时增加修订号，例如 `v20261010-v2`，对应全量包 `fuyaorime-20261010-v2.zip`。增量包使用完整版本名，例如 `fuyaorime-20261010-v2-diff-from-20261010.zip`，只适用于当天原版。旧更新脚本和快捷指令不识别修订号，需要按下方说明更新后使用。
+
 例如，`fuyaorime-20261004-diff-from-20261003.zip` 只能用于从 `20261003` 更新到 `20261004`；本地若是 `20261001`，应下载全量包。
 
 1. 备份现有配置。使用增量包时，先核对包内 `INCREMENTAL-README.txt` 的适用版本与本地版本是否一致。
@@ -56,6 +58,8 @@ FuyaoRime 将[雾凇拼音](https://github.com/iDvel/rime-ice)的配置与词库
 | 跨版、没有匹配的 diff 包，或增量包下载、校验失败 | 下载最新全量包 |
 
 脚本不会串联历史增量包。写入配置前会使旧版本标记失效，全部文件处理成功后再记录新版本；写入失败后的下一次运行使用全量包。
+
+版本按日期、同日修订号依次比较，例如 `20261010 < 20261010-v2 < 20261010-v10 < 20261011`。增量包说明和 Release 文件清单分别列出新增、修改及删除文件。
 
 全量安装采用覆盖方式，不会清空配置目录，也不会自动清理历史版本遗留的全部文件。自行修改的同名配置会被覆盖，请保留备份。
 
@@ -207,6 +211,8 @@ schtasks /Create /SC DAILY /ST 09:00 /TN "FuyaoRime Update" ^
 [`sync.yml`](.github/workflows/sync.yml) 使用 `0 21 * * *`，计划每天 UTC 21:00（北京时间次日 05:00）触发。GitHub Actions 不保证准点运行，负载较高时可能延后，详见[官方调度说明](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)。
 
 工作流同步雾凇拼音、万象语言模型和额外词库，再叠加 `overlay/` 生成配置包。维基百科、维基文库和维基词典另按月从 Wikimedia 标题数据构建，网络俚语每日检查页面变化。同步也可在 [Actions](https://github.com/skyrocketingHong/FuyaoRime/actions/workflows/sync.yml) 中手动触发。
+
+手动触发时，`revision` 默认为 `1`；填写 `2` 会生成当天的 `-v2` 版本。`release_note` 用于填写本次主要更新，留空时使用例行同步说明。增量基线自动选取目标版本之前最近的稳定版，包括同日较早修订版。Release 的词库来源、包内版本及增量文件清单由脚本生成。
 
 <details>
 <summary>手动构建配置包</summary>

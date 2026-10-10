@@ -269,6 +269,34 @@ class UpdaterCases:
                 self.assertEqual((self.rime / "config.yaml").read_text(), "old")
                 self.assertFalse((self.fixture / "redeployed").exists())
 
+    def test_same_day_revision_uses_matching_diff(self):
+        target = LATEST + "-v2"
+        self.latest_url = LATEST_URL.replace('/latest', f'/tag/v{target}')
+        self.marker.write_text(LATEST + "\n")
+        name = self.diff(base=LATEST, target=target)
+        self.assertEqual(self.run_update(), [name])
+        self.assertEqual(self.marker.read_text().strip(), target)
+        self.assertEqual((self.rime / "config.yaml").read_text(), "diff")
+
+    def test_revision_comparison_is_numeric_and_date_takes_precedence(self):
+        self.marker.write_text(LATEST + "-v10\n")
+        self.latest_url = LATEST_URL.replace('/latest', f'/tag/v{LATEST}-v2')
+        self.assertEqual(self.run_update(), [])
+        self.assertEqual(self.marker.read_text().strip(), LATEST + "-v10")
+        target = "20261005"
+        self.latest_url = LATEST_URL.replace('/latest', f'/tag/v{target}')
+        name = self.diff(base=LATEST + "-v10", target=target)
+        self.assertEqual(self.run_update(), [name])
+        self.assertEqual(self.marker.read_text().strip(), target)
+
+    def test_revision_two_can_update_to_revision_ten(self):
+        self.marker.write_text(LATEST + "-v2\n")
+        target = LATEST + "-v10"
+        self.latest_url = LATEST_URL.replace('/latest', f'/tag/v{target}')
+        name = self.diff(base=LATEST + "-v2", target=target)
+        self.assertEqual(self.run_update(), [name])
+        self.assertEqual(self.marker.read_text().strip(), target)
+
     def test_full_download_failure_preserves_old_version(self):
         (self.assets / FULL).unlink()
         self.run_update(success=False)
@@ -283,6 +311,7 @@ class UpdaterCases:
 
     def test_invalid_release_redirect_leaves_configuration_untouched(self):
         for url in (LATEST_URL, LATEST_URL.replace('/latest', '/tag/nightly'),
+                    self.latest_url + '-v0', self.latest_url + '-v02', self.latest_url + '-v10000',
                     self.latest_url.replace('FuyaoRime', 'OtherRepo')):
             with self.subTest(url=url):
                 self.latest_url = url

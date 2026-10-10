@@ -4,7 +4,22 @@ on:
   schedule:
     # 计划每天 UTC 21:00（北京时间次日 05:00）触发，实际调度可能延迟
     - cron: '0 21 * * *'
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: '同日修订号，1 不加后缀，2 发布为 -v2'
+        required: true
+        default: '1'
+        type: string
+      release_note:
+        description: '本次主要更新，留空使用例行同步说明'
+        required: false
+        default: ''
+        type: string
+
+concurrency:
+  group: fuyaorime-sync-release
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -16,30 +31,36 @@ jobs:
       - name: Checkout this repo
         uses: actions/checkout@v7
 
-      - name: Set date
-        id: date
-        # 使用东八区运行日期，与北京时间的发布日期保持一致
-        run: echo "DATE=$(TZ=Asia/Shanghai date +%Y%m%d)" >> $GITHUB_ENV
+      - name: Set release version
+        env:
+          RELEASE_REVISION: ${{ github.event.inputs.revision || '1' }}
+        run: |
+          python3 - <<'PYTHON'
+          import datetime, os, re
+          revision = os.environ['RELEASE_REVISION']
+          if not re.fullmatch(r'[1-9][0-9]{0,3}', revision):
+              raise SystemExit('revision 必须为 1 至 9999 的整数')
+          date = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime('%Y%m%d')
+          version = date if revision == '1' else f'{date}-v{revision}'
+          with open(os.environ['GITHUB_ENV'], 'a') as handle:
+              handle.write(f'DATE={date}\nVERSION={version}\n')
+          PYTHON
 
       - name: Download previous release package
-        # 最新已发布且非当天 tag 的全量包：恢复 custom_dicts 起点 + 增量
-        # 包基线；不能取列表序号（草稿排在已发布之后，.[1] 会取到前天）
+        # 选择当前目标版本之前的最近稳定版，同时作为词库恢复起点与增量基线。
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PREV_TAG=$(gh api "repos/${{ github.repository }}/releases?per_page=10" \
-            --jq "[.[] | select(.draft == false and .tag_name != \"v${{ env.DATE }}\")] | .[0].tag_name // empty")
+          gh api "repos/${{ github.repository }}/releases?per_page=100" > previous-releases.json
+          PREV_TAG=$(python3 scripts/release_notes.py previous "$VERSION" < previous-releases.json)
           if [ -z "$PREV_TAG" ]; then
             echo "无已发布的历史 release，custom_dicts 从零开始、跳过增量包"
             exit 0
           fi
           PREV_DATE="${PREV_TAG#v}"
           mkdir -p prev_release
-          if ! gh release download "$PREV_TAG" -R "${{ github.repository }}" \
-              -p "fuyaorime-${PREV_DATE}.zip" -D prev_release; then
-            echo "下载上一版全量包失败，custom_dicts 从零开始、跳过增量包"
-            exit 0
-          fi
+          gh release download "$PREV_TAG" -R "${{ github.repository }}" \
+            -p "fuyaorime-${PREV_DATE}.zip" -D prev_release
           echo "PREV_TAG=${PREV_TAG}" >> "$GITHUB_ENV"
           echo "PREV_DATE=${PREV_DATE}" >> "$GITHUB_ENV"
           echo "上一版全量包: ${PREV_TAG}"
@@ -96,7 +117,7 @@ jobs:
       - name: Create release package
         run: |
           cd output
-          zip -r ../fuyaorime-${{ env.DATE }}.zip .
+          zip -r ../fuyaorime-${{ env.VERSION }}.zip .
 
       - name: Create incremental diff package
         # 基线 zip 已在 prev_release/，与 custom_dicts 恢复共用同一次下载
@@ -107,101 +128,22 @@ jobs:
           fi
           python3 scripts/make_diff_package.py output \
             "prev_release/fuyaorime-${PREV_DATE}.zip" \
-            "fuyaorime-${{ env.DATE }}-diff-from-${PREV_DATE}.zip" \
-            "$PREV_DATE" "${{ env.DATE }}"
+            "fuyaorime-${{ env.VERSION }}-diff-from-${PREV_DATE}.zip" \
+            "$PREV_DATE" "$VERSION" --summary diff-summary.json
 
       - name: Generate release notes
-        run: |
-          echo "自动同步的 Rime 配置包" > release_notes.md
-          echo "" >> release_notes.md
-
-          HAS_CHANGES=false
-          RIME_ICE_HASH_FILE="scripts/.rime_ice_hash"
-          WANXIANG_HASH_FILE="scripts/.wanxiang_hash"
-
-          echo "## 上游更新" >> release_notes.md
-          echo "" >> release_notes.md
-
-          # 雾凇拼音对比
-          echo "### 雾凇拼音 (rime-ice)" >> release_notes.md
-          cd upstream/rime-ice
-          CURRENT_HASH=$(git rev-parse --short HEAD)
-          cd ../..
-          if [ -f "$RIME_ICE_HASH_FILE" ]; then
-            PREV_HASH=$(cat "$RIME_ICE_HASH_FILE")
-            if [ "$CURRENT_HASH" != "$PREV_HASH" ]; then
-              CHANGES=$(cd upstream/rime-ice && git log -1 --format="- [%h](https://github.com/iDvel/rime-ice/commit/%H) %s (%cd)" --date=short 2>/dev/null)
-              echo "$CHANGES" >> release_notes.md
-              HAS_CHANGES=true
-            else
-              echo "- 无更新" >> release_notes.md
-            fi
-          fi
-          echo "$CURRENT_HASH" > "$RIME_ICE_HASH_FILE"
-
-          # 语言模型版本
-          echo "### 语言模型" >> release_notes.md
-          if [ -f upstream/wanxiang/version.txt ]; then
-            gram_version=$(cat upstream/wanxiang/version.txt)
-            echo "- 万象语言模型版本: $gram_version" >> release_notes.md
-          fi
-          echo "" >> release_notes.md
-
-          # 获取自定义词库更新信息
-          echo "## 自定义词库更新" >> release_notes.md
-          echo "" >> release_notes.md
-
-          # 检查各个自定义词库是否有更新
-          CUSTOM_DICTS=("zhwiki" "web-slang" "zhwikisource" "zhwiktionary" "moegirl" "cn_places" "popular_new_words" "chinese_names" "chengyu_suyu" "gushi_mingju" "tangshi_300")
-          for dict_name in "${CUSTOM_DICTS[@]}"; do
-            dict_file="custom_dicts/${dict_name}.dict.yaml"
-            if [ -f "$dict_file" ]; then
-              version=$(grep -oP 'version:\s*"?\K[^"\s]+' "$dict_file" 2>/dev/null || echo "未知")
-              echo "- ${dict_name} (版本: ${version})" >> release_notes.md
-              HAS_CHANGES=true
-            fi
-          done
-          echo "" >> release_notes.md
-
-          # 如果没有任何更新，显示例行更新
-          if [ "$HAS_CHANGES" = false ]; then
-            echo "## 更新说明" >> release_notes.md
-            echo "" >> release_notes.md
-            echo "- 例行更新，上游无变更" >> release_notes.md
-            echo "" >> release_notes.md
-          fi
-
-          # 增量包说明
-          DIFF_ZIP=$(ls fuyaorime-${{ env.DATE }}-diff-from-*.zip 2>/dev/null | head -1)
-          if [ -n "$DIFF_ZIP" ]; then
-            echo "## 增量更新包" >> release_notes.md
-            echo "" >> release_notes.md
-            echo "- \`${DIFF_ZIP}\`：相对上一版的增量包，已安装上一版的用户下载后解压覆盖到 Rime 配置目录并重新部署即可，详见包内 INCREMENTAL-README.txt" >> release_notes.md
-            echo "" >> release_notes.md
-          fi
-
-          # 包含内容说明
-          echo "## 包含内容" >> release_notes.md
-          echo "- 雾凇拼音全部输入方案（全拼、七种双拼、九键 T9 等）" >> release_notes.md
-          echo "- 雾凇拼音最新词库" >> release_notes.md
-          echo "- 万象拼音语言模型" >> release_notes.md
-          echo "- 自定义词库（维基百科、萌娘百科等）" >> release_notes.md
-          echo "- 全拼无前缀拆字混输与带声调注音，保留 uU 反查入口" >> release_notes.md
-          echo "- 自定义皮肤和配置" >> release_notes.md
-          echo "" >> release_notes.md
-
-          # 使用方法
-          echo "## 使用方法" >> release_notes.md
-          echo "1. 下载 \`fuyaorime-*.zip\`" >> release_notes.md
-          echo "2. 解压到 Rime 配置目录" >> release_notes.md
-          echo "3. 重新部署" >> release_notes.md
+        env:
+          RELEASE_HIGHLIGHT: ${{ github.event.inputs.release_note || '' }}
+        run: python3 scripts/release_notes.py render "$VERSION"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
         with:
-          tag_name: v${{ env.DATE }}
-          name: FuyaoRime ${{ env.DATE }}
+          tag_name: v${{ env.VERSION }}
+          name: FuyaoRime ${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          make_latest: 'true'
           body_path: release_notes.md
           files: fuyaorime-*.zip
           draft: false
@@ -213,6 +155,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git -C upstream/rime-ice rev-parse --short HEAD > scripts/.rime_ice_hash
           git add scripts/.rime_ice_hash scripts/.zhwiki_build_rules
           git diff --cached --quiet || git commit -m "chore: 更新上游仓库 hash 记录"
           git push

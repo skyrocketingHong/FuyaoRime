@@ -70,7 +70,7 @@ def build_workflow():
     action("proxy", "gettext", WFTextActionText=text(""), CustomOutputName="下载代理前缀")
     action("latest", "url.expand", URL=REPOSITORY + "/releases/latest")
     action("version", "text.match", text=text(output("latest", "Expanded URL")),
-           WFMatchTextPattern=r"(?<=^https://github\.com/skyrocketingHong/FuyaoRime/releases/tag/v)[0-9]{8}$",
+           WFMatchTextPattern=r"(?<=^https://github\.com/skyrocketingHong/FuyaoRime/releases/tag/v)[0-9]{8}(?:-v[1-9][0-9]{0,3})?$",
            WFMatchTextCaseSensitive=True)
     if_empty("invalid-version", "version-group", output("version", "Matches"))
     action("version-error", "alert", WFAlertActionTitle="无法确认 FuyaoRime 最新版本",

@@ -97,6 +97,15 @@ class IosShortcutTests(unittest.TestCase):
     def test_invalid_release_stops_before_download(self):
         self.assertIsNone(self.download_address("https://proxy.example", BUILDER.REPOSITORY + "/releases/latest"))
         self.assertIsNone(self.download_address("", "https://github.com/other/repo/releases/tag/v20261004"))
+        for suffix in ('-v0', '-v02', '-v10000'):
+            self.assertIsNone(self.download_address("", LATEST + suffix))
+
+    def test_revision_is_preserved_in_direct_and_proxy_package_urls(self):
+        for suffix in ('-v2', '-v10'):
+            expected = BUILDER.REPOSITORY + f'/releases/download/v20261004{suffix}/fuyaorime-20261004{suffix}.zip'
+            self.assertEqual(self.download_address('', LATEST + suffix), expected)
+            self.assertEqual(self.download_address('https://proxy.example/', LATEST + suffix),
+                             'https://proxy.example/' + expected)
 
     def test_no_otherwise_or_if_result_wiring(self):
         for action in self.workflow["WFWorkflowActions"]:

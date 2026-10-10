@@ -16,6 +16,8 @@ make_diff_package.py - 生成相对上一版发布包的增量更新包
 """
 
 import hashlib
+import argparse
+import json
 import os
 import sys
 import zipfile
@@ -63,19 +65,28 @@ def read_prev_zip(prev_zip):
 
 
 def main():
-    if len(sys.argv) != 6:
-        print(__doc__)
-        return 1
-    curr_dir, prev_zip, out_zip, prev_date, curr_date = sys.argv[1:6]
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('current_dir')
+    parser.add_argument('previous_zip')
+    parser.add_argument('output_zip')
+    parser.add_argument('previous_version')
+    parser.add_argument('current_version')
+    parser.add_argument('--summary', help='Write the same file changes as JSON for release notes')
+    args = parser.parse_args()
+    curr_dir, prev_zip, out_zip = args.current_dir, args.previous_zip, args.output_zip
+    prev_date, curr_date = args.previous_version, args.current_version
 
     current = collect_current(curr_dir)
     previous = read_prev_zip(prev_zip)
 
-    changed = []   # 新增或修改
+    added, modified = [], []
     for rel_path in sorted(current):
-        if rel_path not in previous or previous[rel_path] != file_sha256(current[rel_path]):
-            changed.append(rel_path)
+        if rel_path not in previous:
+            added.append(rel_path)
+        elif previous[rel_path] != file_sha256(current[rel_path]):
+            modified.append(rel_path)
     deleted = sorted(set(previous) - set(current))
+    changed = sorted(added + modified)
 
     readme = [
         'FuyaoRime 增量更新包',
@@ -88,14 +99,16 @@ def main():
         '  - Linux: ~/.config/rime/',
         '',
     ]
-    if changed:
-        readme.append(f'本包包含 {len(changed)} 个新增或修改的文件:')
-        readme.extend(f'  - {p}' for p in changed)
-    else:
+    for title, paths in [('新增文件', added), ('修改文件', modified)]:
+        if paths:
+            readme.append(f'{title}（{len(paths)} 个）:')
+            readme.extend(f'  - {p}' for p in paths)
+            readme.append('')
+    if not changed and not deleted:
         readme.append('本版与上一版无文件差异，无需下载安装。')
     if deleted:
         readme.append('')
-        readme.append(f'以下 {len(deleted)} 个文件已从配置包移除，可手动删除（不删除一般不影响使用）:')
+        readme.append(f'以下 {len(deleted)} 个文件已从配置包移除，请删除对应文件:')
         readme.extend(f'  - {p}' for p in deleted)
     readme.append('')
 
@@ -103,6 +116,11 @@ def main():
         zf.writestr('INCREMENTAL-README.txt', '\n'.join(readme))
         for rel_path in changed:
             zf.write(current[rel_path], rel_path)
+
+    if args.summary:
+        with open(args.summary, 'w', encoding='utf-8') as handle:
+            json.dump({'from': prev_date, 'to': curr_date, 'added': added,
+                       'modified': modified, 'deleted': deleted}, handle, ensure_ascii=False, indent=2)
 
     size_mb = os.path.getsize(out_zip) / 1024 / 1024
     print(f'增量包已生成: {out_zip}（{len(changed)} 个文件变更，'

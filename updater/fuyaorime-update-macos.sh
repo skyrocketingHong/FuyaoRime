@@ -62,13 +62,21 @@ fetch() {
     fi
 }
 
+valid_version() { [[ "$1" =~ ^[0-9]{8}(-v[1-9][0-9]{0,3})?$ ]]; }
+
+version_key() {
+    local day="${1%%-v*}" revision=1
+    if [ "$day" != "$1" ]; then revision="${1##*-v}"; fi
+    printf '%s.%04d' "$day" "$revision"
+}
+
 # 公开 Release 跳转不依赖 REST API 的匿名请求额度。
 latest_version() {
     local url version
     url=$(curl -fsSLI --retry 2 --connect-timeout 15 --max-time 45 \
         -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest") || return 1
     version="${url##*/v}"
-    if [[ "$version" =~ ^[0-9]{8}$ ]] && [ "$url" = "https://github.com/$REPO/releases/tag/v$version" ]; then
+    if valid_version "$version" && [ "$url" = "https://github.com/$REPO/releases/tag/v$version" ]; then
         printf '%s\n' "$version"
     else
         log "Release 页面未返回有效的 FuyaoRime 日期版本" >&2
@@ -175,12 +183,12 @@ main() {
         log "已是最新版本 $latest"
         return 0
     fi
-    if [[ "$current" =~ ^[0-9]{8}$ ]] && [[ "$current" > "$latest" ]]; then
+    if valid_version "$current" && [[ "$(version_key "$current")" > "$(version_key "$latest")" ]]; then
         log "本地版本 ${current} 新于远端 ${latest}，跳过更新"
         return 0
     fi
 
-    if [ -z "$current" ] || ! [[ "$current" =~ ^[0-9]{8}$ ]]; then
+    if ! valid_version "$current"; then
         log "未检测到本地版本标记，执行全量安装 $latest"
         install_full
     else

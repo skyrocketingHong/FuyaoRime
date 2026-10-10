@@ -33,13 +33,23 @@ function Write-Log([string]$Message) {
     Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] $Message"
 }
 
+function Test-ReleaseVersion([string]$Version) {
+    return $Version -cmatch '^[0-9]{8}(-v[1-9][0-9]{0,3})?$'
+}
+
+function Get-ReleaseVersionKey([string]$Version) {
+    $parts = $Version -split '-v', 2
+    $revision = if ($parts.Count -eq 2) { [int]$parts[1] } else { 1 }
+    return '{0}.{1:D4}' -f $parts[0], $revision
+}
+
 function Get-LatestVersion {
     # 公开 Release 跳转不依赖 REST API 的匿名请求额度。
     $response = Invoke-WebRequest -UseBasicParsing -Method Head `
         -Uri "https://github.com/$Repo/releases/latest" -TimeoutSec 45
     $uri = $response.BaseResponse.ResponseUri
     if (-not $uri) { $uri = $response.BaseResponse.RequestMessage.RequestUri }
-    $pattern = '^https://github\.com/' + [regex]::Escape($Repo) + '/releases/tag/v([0-9]{8})$'
+    $pattern = '^https://github\.com/' + [regex]::Escape($Repo) + '/releases/tag/v([0-9]{8}(?:-v[1-9][0-9]{0,3})?)$'
     if ([string]$uri.AbsoluteUri -cnotmatch $pattern) {
         throw 'Release 页面未返回有效的 FuyaoRime 日期版本'
     }
@@ -160,7 +170,7 @@ function Update-FuyaoRime {
         Write-Log "已是最新版本 $latest"
         return
     }
-    if ($current -cmatch '^[0-9]{8}$' -and $current -gt $latest) {
+    if ((Test-ReleaseVersion $current) -and (Get-ReleaseVersionKey $current) -gt (Get-ReleaseVersionKey $latest)) {
         Write-Log "本地版本 $current 新于远端 $latest，跳过更新"
         return
     }
@@ -170,7 +180,7 @@ function Update-FuyaoRime {
     try {
         $packageDir = Join-Path $workDir 'package'
         $useDiff = $false
-        if ($current -cmatch '^[0-9]{8}$') {
+        if (Test-ReleaseVersion $current) {
             try {
                 $zip = Join-Path $workDir 'diff.zip'
                 Save-Asset "https://github.com/$Repo/releases/download/v$latest/fuyaorime-$latest-diff-from-$current.zip" $zip
