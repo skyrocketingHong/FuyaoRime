@@ -10,7 +10,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="GPL-3.0"></a>
 </p>
 
-FuyaoRime 将[雾凇拼音](https://github.com/iDvel/rime-ice)的配置与词库、[万象语言模型](https://github.com/amzxyz/RIME-LMDG)及额外词库合并为配置包，供鼠须管、小狼毫和 Linux Rime 客户端使用。
+FuyaoRime 将[雾凇拼音](https://github.com/iDvel/rime-ice)的配置与词库、[万象语言模型](https://github.com/amzxyz/RIME-LMDG)及额外词库合并为配置包，供鼠须管、小狼毫、Linux 及 Android（小企鹅输入法）Rime 客户端使用。
 
 - 保留雾凇拼音的全拼、七种双拼、九键、部件拆字与英文方案。
 - 为全拼配置万象语言模型、额外词库和模糊音。
@@ -40,6 +40,7 @@ FuyaoRime 将[雾凇拼音](https://github.com/iDvel/rime-ice)的配置与词库
 | macOS | `~/Library/Rime/` |
 | Windows | `%APPDATA%\Rime\` |
 | Linux | `${XDG_CONFIG_HOME:-$HOME/.config}/rime/` |
+| Android | `/storage/emulated/0/Android/data/org.fcitx.fcitx5.android/files/data/rime/` |
 
 不同 Linux 客户端可能使用不同目录，请以客户端的实际设置为准。自动更新脚本也支持传入自定义目录。
 
@@ -97,6 +98,28 @@ bash "$HOME/bin/fuyaorime-update-linux.sh" "/path/to/rime"
 
 macOS 脚本接受相同参数。Linux 定时任务缺少图形会话环境时，可能需要在更新后手动重新部署。
 
+### Android：小企鹅输入法（Termux 与 Shizuku）
+
+Android 11 起普通应用无法写入其他应用的 `Android/data` 目录，因此更新脚本在 [Termux](https://termux.dev) 中运行，借助 [Shizuku](https://github.com/RikkaApps/Shizuku) 提供的 `rish` 以 shell 身份写入小企鹅输入法的 Rime 目录；随后强制停止输入法，输入法重启时检测到配置变化会自动重新部署，无需手动操作。
+
+准备条件：
+
+1. 安装 Termux，执行 `termux-setup-storage` 授予存储权限，再安装依赖：`pkg install curl unzip cronie termux-services`。
+2. 启动 Shizuku，按其“终端应用中使用 Shizuku”说明导出 `rish` 与 `rish_shizuku.dex`。Android 14 起 dex 不能放在共享存储，两个文件都复制到 Termux 私有目录：
+
+```bash
+mkdir -p "$HOME/bin"
+cp /storage/emulated/0/Download/rish /storage/emulated/0/Download/rish_shizuku.dex "$HOME/bin/"
+chmod 755 "$HOME/bin/rish"
+curl -fL -o "$HOME/bin/fuyaorime-update-android.sh" \
+  https://raw.githubusercontent.com/skyrocketingHong/FuyaoRime/main/updater/fuyaorime-update-android.sh
+bash "$HOME/bin/fuyaorime-update-android.sh"
+```
+
+脚本默认更新上表列出的 Android 目录。使用 fxliang 等改版时，同时传入对应的包名与目录，例如 `--ime-package org.fcitx.fcitx5.android.fx`。暂存目录默认在 `Download` 下，更新结束后自动清理，可用 `--staging-root` 改为其他 shell 身份可读的共享目录；`--rish` 可显式指定 rish 路径。增量与全量的选择逻辑与桌面脚本一致。
+
+注意：Shizuku 以无线调试方式启动时，手机重启后需重新启动一次 Shizuku，否则脚本会因无法执行 rish 而直接退出。定时任务建议安排在通常解锁前后的时间（如 09:00），避免更新时正在输入。
+
 ### Windows
 
 使用 Windows PowerShell 5.1 或更高版本。脚本会在 Rime 安装目录中查找 `WeaselDeployer.exe` 并执行 `/deploy`；找不到时会提示手动部署。
@@ -139,6 +162,12 @@ Linux：执行 `crontab -e`，添加一行，配置目录不同时在命令后�
 
 ```cron
 0 9 * * * /bin/bash "$HOME/bin/fuyaorime-update-linux.sh" >> "$HOME/.local/state/fuyaorime-update.log" 2>&1
+```
+
+Termux（Android）：先执行 `sv-enable crond` 启用 cronie，再执行 `crontab -e` 添加一行；休眠时段任务会延迟到唤醒后执行，可在 Termux 通知中获取唤醒锁（`termux-wake-lock`）或放宽电池优化：
+
+```cron
+0 9 * * * /data/data/com.termux/files/usr/bin/bash "$HOME/bin/fuyaorime-update-android.sh" >> "$HOME/fuyaorime-update.log" 2>&1
 ```
 
 Windows：在命令提示符中创建任务：

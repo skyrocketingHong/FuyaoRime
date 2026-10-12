@@ -44,6 +44,47 @@ redeploy() { touch "$FUYAORIME_FIXTURE/redeployed"; }
 main
 '''
 
+ANDROID_RUNNER = r'''
+args=("$FUYAORIME_FIXTURE/rime" --rish "$FUYAORIME_FIXTURE/rish" --staging-root "$FUYAORIME_FIXTURE/staging")
+if [ -n "$FUYAORIME_PROXY" ]; then args+=(--github-proxy "$FUYAORIME_PROXY"); fi
+source "$FUYAORIME_SCRIPT" "${args[@]}"
+curl() {
+    local url='' dest='' name
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            -o) dest="$2"; shift ;;
+            https://*) url="$1" ;;
+        esac
+        shift
+    done
+    if [ "$url" = 'https://github.com/skyrocketingHong/FuyaoRime/releases/latest' ]; then
+        printf '%s\n' "$url" >> "$FUYAORIME_FIXTURE/lookups"
+        [ "$(cat "$FUYAORIME_FIXTURE/lookup-status")" = 0 ] || return 22
+        cat "$FUYAORIME_FIXTURE/latest-url"
+        return
+    fi
+    printf '%s\n' "$url" >> "$FUYAORIME_FIXTURE/downloads"
+    name="${url##*/}"
+    printf '%s\n' "$name" >> "$FUYAORIME_FIXTURE/requests"
+    [ -f "$FUYAORIME_FIXTURE/assets/$name" ] || return 1
+    cp "$FUYAORIME_FIXTURE/assets/$name" "$dest"
+}
+main
+'''
+
+# 模拟 Shizuku 的 rish：以 -c 执行单条命令，am 调用映射为重启标记。
+RISH_STUB = '''#!/usr/bin/env bash
+if [ "$#" -ne 2 ] || [ "$1" != "-c" ]; then
+    echo "rish stub: expected -c <command>" >&2
+    exit 2
+fi
+am() {
+    touch "$FUYAORIME_FIXTURE/redeployed"
+    printf 'am %s\\n' "$*" >> "$FUYAORIME_FIXTURE/am-calls"
+}
+eval "$2"
+'''
+
 POWERSHELL_RUNNER = r'''
 . $Env:FUYAORIME_SCRIPT -RimeDir (Join-Path $Env:FUYAORIME_FIXTURE 'rime') -GitHubProxy $Env:FUYAORIME_PROXY
 function Invoke-RestMethod { throw 'REST API must not be called' }
@@ -140,6 +181,8 @@ class UpdaterCases:
             runner = self.fixture / "runner.ps1"
             runner.write_text(POWERSHELL_RUNNER, encoding="utf-8-sig")
             command = [shutil.which("pwsh"), "-NoProfile", "-File", str(runner)]
+        elif self.platform == "android":
+            command = ["/bin/bash", "-c", ANDROID_RUNNER]
         else:
             command = ["/bin/bash", "-c", BASH_RUNNER]
         result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=20)
@@ -370,6 +413,40 @@ class MacOSUpdaterTests(UpdaterCases, unittest.TestCase):
 
 class LinuxUpdaterTests(UpdaterCases, unittest.TestCase):
     platform = "linux"
+
+
+class AndroidUpdaterTests(UpdaterCases, unittest.TestCase):
+    platform = "android"
+
+    def setUp(self):
+        super().setUp()
+        stub = self.fixture / "rish"
+        stub.write_text(RISH_STUB)
+        stub.chmod(0o755)
+
+    def test_update_rejects_link_to_user_data(self):
+        # 写入端先删后拷：同名符号链接被替换为普通文件，不跟随链接改写用户数据。
+        alias = self.rime / "alias.yaml"
+        try:
+            alias.symlink_to(self.rime / "installation.yaml")
+        except OSError:
+            self.skipTest("Symbolic links are unavailable")
+        self.archive(FULL, {"config.yaml": "full", "alias.yaml": "wrong identity"})
+        self.run_update()
+        self.assert_installed("full")
+        self.assertFalse(alias.is_symlink())
+        self.assertEqual((self.rime / "alias.yaml").read_text(), "wrong identity")
+        self.assertEqual((self.rime / "installation.yaml").read_text(), "local installation")
+
+    def test_restart_targets_configured_ime_package(self):
+        self.diff()
+        self.run_update()
+        self.assertEqual((self.fixture / "am-calls").read_text().splitlines(),
+                         ["am force-stop org.fcitx.fcitx5.android"])
+
+    def test_staging_directory_is_cleaned_after_run(self):
+        self.run_update()
+        self.assertFalse((self.fixture / "staging" / "fuyaorime-update-staging").exists())
 
 
 @unittest.skipUnless(shutil.which("pwsh"), "PowerShell is not installed")
