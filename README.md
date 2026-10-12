@@ -64,9 +64,9 @@ FuyaoRime 将[雾凇拼音](https://github.com/iDvel/rime-ice)的配置与词库
 
 全量安装采用覆盖方式，不会清空配置目录，也不会自动清理历史版本遗留的全部文件。自行修改的同名配置会被覆盖，请保留备份。
 
-桌面脚本会跳过 `installation.yaml`、`userdb` 和所有 `*.userdb` 数据库及其内部文件，更新包覆盖与增量删除清单均不能修改这些路径；其他目录也不会因删除清单而被整目录删除。此保护针对更新器的文件操作，输入法重新部署时仍按自身规则处理用户数据。
+更新脚本会跳过 `installation.yaml`、`userdb` 和所有 `*.userdb` 数据库及其内部文件，更新包覆盖与增量删除清单均不能修改这些路径；其他目录也不会因删除清单而被整目录删除。此保护针对更新器的文件操作，输入法重新部署时仍按自身规则处理用户数据。
 
-macOS 和 Linux 下载时显示 curl 的下载量、速度和预计剩余时间；Windows 使用 PowerShell 原生下载进度。所有桌面脚本都会提示查询版本、开始下载、下载完成、校验和解压等阶段。服务器未提供总大小时，百分比或剩余时间可能不可用。macOS 和 Linux 连续 60 秒传输速度低于 1 字节每秒时会中止本次下载，并按 curl 的重试规则最多重试两次。
+macOS、Linux 和 Android 下载时显示 curl 的下载量、速度和预计剩余时间；Windows 使用 PowerShell 原生下载进度。所有脚本都会提示查询版本、开始下载、下载完成、校验和解压等阶段。服务器未提供总大小时，百分比或剩余时间可能不可用。macOS、Linux 和 Android 连续 60 秒传输速度低于 1 字节每秒时会中止本次下载，并按 curl 的重试规则最多重试两次。
 
 ### macOS
 
@@ -139,7 +139,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\fuyaorime-
 
 | 平台 | 参数 |
 | :--- | :--- |
-| macOS、Linux | `--github-proxy <代理前缀>` |
+| macOS、Linux、Android | `--github-proxy <代理前缀>` |
 | Windows | `-GitHubProxy <代理前缀>` |
 
 代理前缀为完整的 HTTP(S) 地址，可包含服务路径，不含查询串或片段。脚本按“代理前缀 + `/` + 原始 GitHub 下载地址”拼接，仅影响全量包和 diff 包下载；版本查询仍直连 GitHub。省略参数即恢复直连，定时任务可在脚本命令后添加同一参数。
@@ -279,7 +279,7 @@ FuyaoRime/
 ├── .github/workflows/sync.yml   # 每日同步与发布
 ├── overlay/                    # 自定义配置和皮肤
 ├── scripts/                    # 词库获取、生成、合并及增量打包
-├── updater/                    # 三平台客户端更新脚本
+├── updater/                    # 四平台客户端更新脚本
 ├── tests/                      # 更新逻辑、注音资源与 Rime 引擎回归测试
 ├── custom_dicts/               # 构建时生成的额外词库
 ├── upstream/                   # 构建时下载的上游文件
