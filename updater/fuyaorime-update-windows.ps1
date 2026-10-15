@@ -121,7 +121,11 @@ function Copy-PackageFiles([string]$Source, [string]$RelativePath = '') {
             Copy-PackageFiles $item.FullName $relative
         } else {
             if (Test-Path -LiteralPath $target -PathType Container) { throw '无法用配置文件替换已有目录' }
-            Copy-Item -LiteralPath $item.FullName -Destination $target -Force
+            try {
+                Copy-Item -LiteralPath $item.FullName -Destination $target -Force
+            } catch {
+                throw "无法覆盖配置文件 ${relative}；请确认小狼毫和其他 Rime 进程已释放该文件。原始错误：$($_.Exception.Message)"
+            }
         }
     }
 }
@@ -146,15 +150,84 @@ function Remove-DeletedFiles([string]$ReadmePath) {
     }
 }
 
-function Invoke-Redeploy {
+function Enter-WeaselUpdateLock {
+    # 与小狼毫部署器共用此互斥体，阻止 TSF 在覆盖期间自动拉起服务。
+    $created = $false
+    $mutex = [Threading.Mutex]::new($false, 'WeaselDeployerExclusiveMutex', [ref]$created)
+    if (-not $created) {
+        $mutex.Dispose()
+        throw '小狼毫正在部署或更新，请等待完成后重试；尚未写入配置'
+    }
+    return $mutex
+}
+
+function Get-WeaselServerState {
+    $sessionId = (Get-Process -Id $PID).SessionId
+    $servers = @(Get-Process -Name 'WeaselServer' -ErrorAction SilentlyContinue |
+        Where-Object { $_.SessionId -eq $sessionId })
+    if ($servers.Count -eq 0) { return $null }
+    if ($servers.Count -ne 1) {
+        throw '当前会话存在多个小狼毫服务进程，请先退出多余实例后重试；尚未写入配置'
+    }
+    $server = $servers[0]
+    $executablePath = $server.Path
+    if (-not $executablePath -or -not (Test-Path -LiteralPath $executablePath -PathType Leaf)) {
+        throw '无法确定正在运行的小狼毫程序路径，请从开始菜单退出小狼毫后重试；尚未写入配置'
+    }
+    return [PSCustomObject]@{
+        Process = $server
+        ExecutablePath = $executablePath
+        InstallDir = Split-Path -Parent $executablePath
+    }
+}
+
+function Stop-WeaselServer($State) {
+    if (-not $State -or $State.Process.HasExited) { return }
+    Write-Log '正在退出小狼毫，释放词典和语言模型文件'
+    $quitProcess = Start-Process -FilePath $State.ExecutablePath -ArgumentList '/quit' -PassThru
+    # /quit 只发送退出请求，必须等待原服务进程退出，而不是等待命令进程。
+    if (-not $State.Process.WaitForExit(15000)) {
+        throw '小狼毫在 15 秒内未退出，已停止更新；请从开始菜单退出小狼毫后重试'
+    }
+    if (-not $quitProcess.WaitForExit(15000)) {
+        throw '小狼毫退出命令尚未结束，已停止更新；请等待退出后从开始菜单启动小狼毫并重试'
+    }
+}
+
+function Restore-WeaselServer($State) {
+    if (-not $State -or -not $State.Process.HasExited) { return }
+    try {
+        $sessionId = (Get-Process -Id $PID).SessionId
+        $running = @(Get-Process -Name 'WeaselServer' -ErrorAction SilentlyContinue |
+            Where-Object { $_.SessionId -eq $sessionId })
+        if ($running.Count -gt 0) { return }
+        Start-Process -FilePath $State.ExecutablePath | Out-Null
+        Write-Log '已请求恢复小狼毫服务'
+    } catch {
+        Write-Warning "小狼毫未能自动恢复，请从开始菜单启动小狼毫。原始错误：$($_.Exception.Message)"
+    }
+}
+
+function Invoke-Redeploy([string]$InstallDir = '') {
+    $deployer = $null
+    if ($InstallDir) {
+        $path = Join-Path $InstallDir 'WeaselDeployer.exe'
+        if (Test-Path -LiteralPath $path -PathType Leaf) { $deployer = Get-Item -LiteralPath $path }
+    }
     $roots = @("$Env:ProgramFiles\Rime", "${Env:ProgramFiles(x86)}\Rime") |
         Where-Object { $_ -and (Test-Path $_) }
-    $deployer = $roots | ForEach-Object {
-        Get-ChildItem -Path $_ -Recurse -Filter 'WeaselDeployer.exe' -ErrorAction SilentlyContinue
-    } | Select-Object -First 1
+    if (-not $deployer) {
+        $deployer = $roots | ForEach-Object {
+            Get-ChildItem -LiteralPath $_ -Recurse -Filter 'WeaselDeployer.exe' -ErrorAction SilentlyContinue
+        } | Select-Object -First 1
+    }
     if ($deployer) {
-        Start-Process -FilePath $deployer.FullName -ArgumentList '/deploy'
-        Write-Log '已通知小狼毫重新部署'
+        Write-Log '正在重新部署小狼毫，请等待部署命令完成'
+        $deployment = Start-Process -FilePath $deployer.FullName -ArgumentList '/deploy' -Wait -PassThru
+        if ($deployment.ExitCode -ne 0) {
+            throw "配置已写入，但小狼毫部署命令失败（退出码 $($deployment.ExitCode)），请手动重新部署"
+        }
+        Write-Log '小狼毫部署命令执行完成'
     } else {
         Write-Log '未找到 WeaselDeployer.exe，请在小狼毫菜单手动选择"重新部署"'
     }
@@ -165,7 +238,11 @@ function Update-FuyaoRime {
     $latest = Get-LatestVersion
 
     New-Item -ItemType Directory -Path $RimeDir -Force | Out-Null
-    $current = if (Test-Path -LiteralPath $Marker) { ([string](Get-Content -LiteralPath $Marker -Raw)).Trim() } else { '' }
+    $current = ''
+    if (Test-Path -LiteralPath $Marker) {
+        $content = Get-Content -LiteralPath $Marker -Raw
+        if ($null -ne $content) { $current = $content.Trim() }
+    }
     if ($current -eq $latest) {
         Write-Log "已是最新版本 $latest"
         return
@@ -207,23 +284,36 @@ function Update-FuyaoRime {
             Expand-Archive -Path $zip -DestinationPath $packageDir -Force
         }
 
-        # 写入中断后无法再信任旧基线，下次运行须使用全量包。
-        Write-Log '正在更新配置，保留安装信息和用户数据库'
-        if (Test-Path -LiteralPath $Marker) { Remove-Item -LiteralPath $Marker -Force }
-        Copy-PackageFiles $packageDir
-        if ($useDiff) {
-            Remove-DeletedFiles (Join-Path $packageDir 'INCREMENTAL-README.txt')
-            Remove-Item -LiteralPath (Join-Path $RimeDir 'INCREMENTAL-README.txt') -Force
-            Write-Log "已应用增量包 $current -> $latest"
-        } else {
-            Write-Log "已应用全量包 $latest"
+        $updateLock = Enter-WeaselUpdateLock
+        $weasel = $null
+        try {
+            $weasel = Get-WeaselServerState
+            Stop-WeaselServer $weasel
+
+            # 写入中断后无法再信任旧基线，下次运行须使用全量包。
+            Write-Log '正在更新配置，保留安装信息和用户数据库'
+            if (Test-Path -LiteralPath $Marker) { Remove-Item -LiteralPath $Marker -Force }
+            Copy-PackageFiles $packageDir
+            if ($useDiff) {
+                Remove-DeletedFiles (Join-Path $packageDir 'INCREMENTAL-README.txt')
+                Remove-Item -LiteralPath (Join-Path $RimeDir 'INCREMENTAL-README.txt') -Force
+                Write-Log "已应用增量包 $current -> $latest"
+            } else {
+                Write-Log "已应用全量包 $latest"
+            }
+            Set-Content -Path $Marker -Value $latest -Encoding ASCII
+
+            # 部署器自己会获取同名互斥体，调用前必须释放。
+            $updateLock.Dispose()
+            $updateLock = $null
+            Invoke-Redeploy $weasel.InstallDir
+        } finally {
+            if ($updateLock) { $updateLock.Dispose() }
+            Restore-WeaselServer $weasel
         }
-        Set-Content -Path $Marker -Value $latest -Encoding ASCII
     } finally {
         Remove-Item $workDir -Recurse -Force -ErrorAction SilentlyContinue
     }
-
-    Invoke-Redeploy
 }
 
 if ($MyInvocation.InvocationName -ne '.') {

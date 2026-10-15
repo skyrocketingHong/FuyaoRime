@@ -86,6 +86,7 @@ eval "$2"
 '''
 
 POWERSHELL_RUNNER = r'''
+$ErrorActionPreference = 'Stop'
 . $Env:FUYAORIME_SCRIPT -RimeDir (Join-Path $Env:FUYAORIME_FIXTURE 'rime') -GitHubProxy $Env:FUYAORIME_PROXY
 function Invoke-RestMethod { throw 'REST API must not be called' }
 function Invoke-WebRequest {
@@ -94,7 +95,7 @@ function Invoke-WebRequest {
         Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'downloads') $Uri
         $name = ($Uri -split '/')[-1]
         Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'requests') $name
-        Copy-Item (Join-Path $Env:FUYAORIME_FIXTURE "assets/$name") $OutFile -ErrorAction Stop
+        Microsoft.PowerShell.Management\Copy-Item (Join-Path $Env:FUYAORIME_FIXTURE "assets/$name") $OutFile -ErrorAction Stop
         return
     }
     Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'lookups') $Uri
@@ -109,8 +110,56 @@ function Invoke-WebRequest {
         RequestMessage = [PSCustomObject]@{ RequestUri = $url }
     } }
 }
-function Invoke-Redeploy {
+function Enter-WeaselUpdateLock {
+    Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'lifecycle') 'lock'
+    if (Test-Path (Join-Path $Env:FUYAORIME_FIXTURE 'deployment-active')) {
+        throw 'Another deployment is active'
+    }
+    $lock = [PSCustomObject]@{}
+    $lock | Add-Member -MemberType ScriptMethod -Name Dispose -Value {
+        Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'lifecycle') 'unlock'
+    }
+    return $lock
+}
+function Get-WeaselServerState {
+    if (-not (Test-Path (Join-Path $Env:FUYAORIME_FIXTURE 'server-running'))) { return $null }
+    return [PSCustomObject]@{
+        Process = [PSCustomObject]@{ HasExited = $false }
+        ExecutablePath = Join-Path $Env:FUYAORIME_FIXTURE 'weasel/WeaselServer.exe'
+        InstallDir = Join-Path $Env:FUYAORIME_FIXTURE 'weasel'
+    }
+}
+function Stop-WeaselServer($State) {
+    if (-not $State) { return }
+    Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'lifecycle') 'stop'
+    if (Test-Path (Join-Path $Env:FUYAORIME_FIXTURE 'stop-fails')) { throw 'Server did not exit' }
+    Remove-Item (Join-Path $Env:FUYAORIME_FIXTURE 'server-running')
+    $State.Process.HasExited = $true
+}
+$copyPackageFiles = ${function:Copy-PackageFiles}
+function Copy-PackageFiles([string]$Source, [string]$RelativePath = '') {
+    if (-not $RelativePath) { Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'lifecycle') 'copy' }
+    & $copyPackageFiles $Source $RelativePath
+}
+function Copy-Item {
+    [CmdletBinding()]
+    param([string]$LiteralPath, [string]$Destination, [switch]$Force)
+    if ((Test-Path (Join-Path $Env:FUYAORIME_FIXTURE 'copy-fails')) -and
+        $Destination -eq (Join-Path $Env:FUYAORIME_FIXTURE 'rime/config.yaml')) {
+        throw 'The requested operation cannot be performed on a file with a user-mapped section open.'
+    }
+    Microsoft.PowerShell.Management\Copy-Item @PSBoundParameters
+}
+function Invoke-Redeploy([string]$InstallDir) {
+    Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'lifecycle') 'deploy'
+    Set-Content (Join-Path $Env:FUYAORIME_FIXTURE 'deploy-install-dir') $InstallDir
+    Copy-Item -LiteralPath $Marker -Destination (Join-Path $Env:FUYAORIME_FIXTURE 'deploy-version')
     New-Item (Join-Path $Env:FUYAORIME_FIXTURE 'redeployed') -ItemType File | Out-Null
+}
+function Restore-WeaselServer($State) {
+    if (-not $State) { return }
+    Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'lifecycle') 'restore'
+    New-Item (Join-Path $Env:FUYAORIME_FIXTURE 'server-running') -ItemType File -Force | Out-Null
 }
 Update-FuyaoRime
 '''
@@ -172,6 +221,7 @@ class UpdaterCases:
         (self.fixture / "downloads").unlink(missing_ok=True)
         (self.fixture / "redeployed").unlink(missing_ok=True)
         (self.fixture / "lookups").unlink(missing_ok=True)
+        (self.fixture / "lifecycle").unlink(missing_ok=True)
         (self.fixture / "latest-url").write_text(self.latest_url)
         (self.fixture / "lookup-status").write_text(str(self.lookup_status))
         env = dict(os.environ, FUYAORIME_FIXTURE=str(self.fixture), FUYAORIME_PROXY=self.proxy)
@@ -186,6 +236,7 @@ class UpdaterCases:
         else:
             command = ["/bin/bash", "-c", BASH_RUNNER]
         result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=20)
+        self.result = result
         if success:
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         else:
@@ -452,6 +503,240 @@ class AndroidUpdaterTests(UpdaterCases, unittest.TestCase):
 @unittest.skipUnless(shutil.which("pwsh"), "PowerShell is not installed")
 class WindowsUpdaterTests(UpdaterCases, unittest.TestCase):
     platform = "windows"
+
+    def lifecycle(self):
+        path = self.fixture / "lifecycle"
+        return path.read_text().splitlines() if path.exists() else []
+
+    def test_server_stops_before_writing_and_restores_after_deployment(self):
+        (self.fixture / "server-running").touch()
+        self.diff()
+        self.run_update()
+        self.assertEqual(self.lifecycle(), ["lock", "stop", "copy", "unlock", "deploy", "restore"])
+        self.assert_installed("diff")
+        self.assertEqual((self.fixture / "deploy-version").read_text().strip(), LATEST)
+        self.assertEqual((self.fixture / "deploy-install-dir").read_text().strip(), str(self.fixture / "weasel"))
+        self.assertTrue((self.fixture / "server-running").exists())
+
+    def test_interrupted_write_invalidates_marker_and_restores_server(self):
+        (self.fixture / "server-running").touch()
+        (self.fixture / "copy-fails").touch()
+        self.diff()
+        self.run_update(success=False)
+        self.assertEqual(self.lifecycle(), ["lock", "stop", "copy", "unlock", "restore"])
+        self.assertFalse(self.marker.exists())
+        self.assertFalse((self.fixture / "redeployed").exists())
+        self.assertTrue((self.fixture / "server-running").exists())
+        self.assertIn("config.yaml", self.result.stdout + self.result.stderr)
+
+    def test_failed_stop_preserves_old_version_and_configuration(self):
+        (self.fixture / "server-running").touch()
+        (self.fixture / "stop-fails").touch()
+        self.diff()
+        self.run_update(success=False)
+        self.assertEqual(self.lifecycle(), ["lock", "stop", "unlock", "restore"])
+        self.assertEqual(self.marker.read_text().strip(), "20261003")
+        self.assertEqual((self.rime / "config.yaml").read_text(), "old")
+        self.assertTrue((self.fixture / "server-running").exists())
+        self.assertFalse((self.fixture / "redeployed").exists())
+
+    def test_active_deployment_blocks_update_before_stopping_or_writing(self):
+        (self.fixture / "server-running").touch()
+        (self.fixture / "deployment-active").touch()
+        self.diff()
+        self.run_update(success=False)
+        self.assertEqual(self.lifecycle(), ["lock"])
+        self.assertEqual(self.marker.read_text().strip(), "20261003")
+        self.assertEqual((self.rime / "config.yaml").read_text(), "old")
+        self.assertTrue((self.fixture / "server-running").exists())
+
+    def test_download_failure_does_not_stop_server(self):
+        (self.fixture / "server-running").touch()
+        (self.assets / FULL).unlink()
+        self.run_update(success=False)
+        self.assertEqual(self.lifecycle(), [])
+        self.assertTrue((self.fixture / "server-running").exists())
+        self.assertEqual(self.marker.read_text().strip(), "20261003")
+
+    def test_current_version_does_not_stop_server(self):
+        (self.fixture / "server-running").touch()
+        self.marker.write_text(LATEST + "\n")
+        self.assertEqual(self.run_update(), [])
+        self.assertEqual(self.lifecycle(), [])
+        self.assertTrue((self.fixture / "server-running").exists())
+
+    def test_previously_stopped_server_is_not_started(self):
+        self.diff()
+        self.run_update()
+        self.assertEqual(self.lifecycle(), ["lock", "copy", "unlock", "deploy"])
+        self.assertFalse((self.fixture / "server-running").exists())
+
+
+@unittest.skipUnless(shutil.which("pwsh"), "PowerShell is not installed")
+class WindowsWeaselHelperTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="fuyaorime process test-")
+        self.addCleanup(self.temp.cleanup)
+        self.fixture = Path(self.temp.name)
+        (self.fixture / "weasel").mkdir()
+        (self.fixture / "weasel" / "WeaselServer.exe").touch()
+        (self.fixture / "weasel" / "WeaselDeployer.exe").touch()
+
+    def run_helper(self, body, success=True):
+        runner = self.fixture / "runner.ps1"
+        runner.write_text(
+            "$ErrorActionPreference = 'Stop'\n"
+            ". $Env:FUYAORIME_SCRIPT -RimeDir (Join-Path $Env:FUYAORIME_FIXTURE 'rime')\n" + body,
+            encoding="utf-8-sig",
+        )
+        env = dict(os.environ, FUYAORIME_FIXTURE=str(self.fixture),
+                   FUYAORIME_SCRIPT=str(ROOT / "updater" / "fuyaorime-update-windows.ps1"))
+        result = subprocess.run([shutil.which("pwsh"), "-NoProfile", "-File", str(runner)],
+                                env=env, capture_output=True, text=True, timeout=10)
+        if success:
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        else:
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        return result
+
+    def test_quit_waits_for_original_process_and_rejects_timeout(self):
+        body = r'''
+$originalExited = $true
+$controllerExited = $true
+$process = [PSCustomObject]@{ HasExited = $false }
+$process | Add-Member -MemberType ScriptMethod -Name WaitForExit -Value {
+    param($Timeout)
+    if ($Timeout -le 0) { throw 'Expected a bounded wait' }
+    Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'events') 'wait-original'
+    return $originalExited
+}
+$controller = [PSCustomObject]@{}
+$controller | Add-Member -MemberType ScriptMethod -Name WaitForExit -Value {
+    param($Timeout)
+    if ($Timeout -le 0) { throw 'Expected a bounded wait' }
+    Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'events') 'wait-controller'
+    return $controllerExited
+}
+function Start-Process {
+    param($FilePath, $ArgumentList, [switch]$Wait, [switch]$PassThru)
+    if ($ArgumentList -ne '/quit' -or $Wait -or -not $PassThru) {
+        throw 'Expected a nonblocking quit request returning its process'
+    }
+    Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'events') 'quit'
+    return $controller
+}
+Stop-WeaselServer ([PSCustomObject]@{
+    Process = $process
+    ExecutablePath = Join-Path $Env:FUYAORIME_FIXTURE 'weasel/WeaselServer.exe'
+})
+'''
+        for original_exited, controller_exited in ((True, True), (False, True), (True, False)):
+            with self.subTest(original_exited=original_exited, controller_exited=controller_exited):
+                (self.fixture / "events").unlink(missing_ok=True)
+                scenario = body
+                if not original_exited:
+                    scenario = scenario.replace("$originalExited = $true", "$originalExited = $false")
+                if not controller_exited:
+                    scenario = scenario.replace("$controllerExited = $true", "$controllerExited = $false")
+                self.run_helper(scenario, success=original_exited and controller_exited)
+                events = ["quit", "wait-original"]
+                if original_exited:
+                    events.append("wait-controller")
+                self.assertEqual((self.fixture / "events").read_text().splitlines(), events)
+
+    def test_restore_starts_only_previously_running_missing_server(self):
+        self.run_helper(r'''
+$session = (Get-Process -Id $PID).SessionId
+$servers = @()
+function Get-Process {
+    [CmdletBinding()]
+    param($Name, $Id)
+    if ($Id) { return [PSCustomObject]@{ SessionId = $session } }
+    return $servers
+}
+function Start-Process {
+    param($FilePath)
+    Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'starts') $FilePath
+}
+$state = [PSCustomObject]@{
+    Process = [PSCustomObject]@{ HasExited = $false }
+    ExecutablePath = Join-Path $Env:FUYAORIME_FIXTURE 'weasel/WeaselServer.exe'
+}
+Restore-WeaselServer $null
+Restore-WeaselServer $state
+$state.Process.HasExited = $true
+$servers = @([PSCustomObject]@{ SessionId = $session })
+Restore-WeaselServer $state
+if (Test-Path (Join-Path $Env:FUYAORIME_FIXTURE 'starts')) { throw 'Unexpected server start' }
+$servers = @([PSCustomObject]@{ SessionId = $session + 1 })
+Restore-WeaselServer $state
+$servers = @([PSCustomObject]@{ SessionId = $session })
+Restore-WeaselServer $state
+''')
+        self.assertEqual((self.fixture / "starts").read_text().splitlines(),
+                         [str(self.fixture / "weasel" / "WeaselServer.exe")])
+
+    def test_server_detection_uses_current_session_and_rejects_ambiguity(self):
+        self.run_helper(r'''
+$session = (Get-Process -Id $PID).SessionId
+$path = Join-Path $Env:FUYAORIME_FIXTURE 'weasel/WeaselServer.exe'
+$current = [PSCustomObject]@{ SessionId = $session; Path = $path }
+$other = [PSCustomObject]@{ SessionId = $session + 1; Path = $path }
+$servers = @($other, $current)
+function Get-Process {
+    [CmdletBinding()]
+    param($Name, $Id)
+    if ($Id) { return [PSCustomObject]@{ SessionId = $session } }
+    return $servers
+}
+$state = Get-WeaselServerState
+if ($state.Process -ne $current -or $state.ExecutablePath -ne $path -or
+    $state.InstallDir -ne (Split-Path -Parent $path)) { throw 'Wrong server selected' }
+$servers = @($other)
+if ($null -ne (Get-WeaselServerState)) { throw 'Other session must not be selected' }
+foreach ($ambiguous in @($true, $false)) {
+    $servers = if ($ambiguous) { @($current, $current) } else {
+        @([PSCustomObject]@{ SessionId = $session; Path = '' })
+    }
+    $rejected = $false
+    try { Get-WeaselServerState | Out-Null } catch { $rejected = $true }
+    if (-not $rejected) { throw 'Unsafe server state must be rejected' }
+}
+''')
+
+    def test_deployment_mutex_rejects_existing_holder_and_releases(self):
+        self.run_helper(r'''
+$held = Enter-WeaselUpdateLock
+try {
+    $rejected = $false
+    try { $second = Enter-WeaselUpdateLock } catch { $rejected = $true }
+    if (-not $rejected) { $second.Dispose(); throw 'Existing deployment was not rejected' }
+} finally {
+    $held.Dispose()
+}
+$next = Enter-WeaselUpdateLock
+$next.Dispose()
+''')
+
+    def test_deployment_waits_and_reports_unsuccessful_exit(self):
+        body = r'''
+function Start-Process {
+    param($FilePath, $ArgumentList, [switch]$Wait, [switch]$PassThru)
+    if ($ArgumentList -ne '/deploy' -or -not $Wait -or -not $PassThru) {
+        throw 'Deployment must wait and collect its exit code'
+    }
+    Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'deployers') $FilePath
+    return [PSCustomObject]@{ ExitCode = 0 }
+}
+Invoke-Redeploy (Join-Path $Env:FUYAORIME_FIXTURE 'weasel')
+'''
+        for succeeded in (True, False):
+            with self.subTest(succeeded=succeeded):
+                (self.fixture / "deployers").unlink(missing_ok=True)
+                self.run_helper(body if succeeded else body.replace("ExitCode = 0", "ExitCode = 1"),
+                                success=succeeded)
+                self.assertEqual((self.fixture / "deployers").read_text().splitlines(),
+                                 [str(self.fixture / "weasel" / "WeaselDeployer.exe")])
 
 
 if __name__ == "__main__":

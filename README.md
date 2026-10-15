@@ -122,7 +122,9 @@ bash "$HOME/bin/fuyaorime-update-android.sh"
 
 ### Windows
 
-使用 Windows PowerShell 5.1 或更高版本。脚本会在 Rime 安装目录中查找 `WeaselDeployer.exe` 并执行 `/deploy`；找不到时会提示手动部署。
+使用 Windows PowerShell 5.1 或更高版本。下载解压完成后，脚本会暂时退出当前会话正在运行的小狼毫，等待词典和语言模型文件释放，再覆盖配置。覆盖期间通过小狼毫的部署互斥机制阻止服务自动拉起；如果已有部署任务或服务未能退出，会在写入前停止更新。
+
+写入完成后，脚本优先使用原服务安装目录中的 `WeaselDeployer.exe` 执行 `/deploy`，否则在默认 Rime 安装目录中查找；找不到时会提示手动部署。部署命令结束或更新出错后，脚本会尝试恢复原先运行的小狼毫服务。更新期间请暂停输入，不要手动启动小狼毫或重复运行更新脚本。
 
 ```powershell
 Invoke-WebRequest -UseBasicParsing `
@@ -132,6 +134,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\fuyaorime-
 ```
 
 自定义目录可通过 `-RimeDir 'D:\Rime'` 传入。更新脚本不包含在配置包中，需要升级脚本时重新执行对应平台的下载命令。
+
+旧脚本若在 `Copy-Item` 时报 `user-mapped section open`，说明目标文件仍被进程映射占用。重新下载脚本后重试；也可从开始菜单退出小狼毫，确认 `WeaselServer.exe` 已退出后重跑旧脚本，最后从开始菜单启动小狼毫。仅切换到英文输入通常不会释放文件。不要通过删除用户数据库或手动补写版本标记处理此错误。
 
 ### 可选下载代理
 
