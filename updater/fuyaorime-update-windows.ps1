@@ -181,10 +181,20 @@ function Get-WeaselServerState {
     }
 }
 
+function Start-WeaselProcess([string]$ExecutablePath, [string]$Arguments = '') {
+    # Windows PowerShell 5.1 的 Start-Process 会追加尾空格，破坏小狼毫的完整参数匹配。
+    $startInfo = [Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $ExecutablePath
+    $startInfo.Arguments = $Arguments
+    $startInfo.WorkingDirectory = Split-Path -Parent $ExecutablePath
+    $startInfo.UseShellExecute = $false
+    return [Diagnostics.Process]::Start($startInfo)
+}
+
 function Stop-WeaselServer($State) {
     if (-not $State -or $State.Process.HasExited) { return }
     Write-Log '正在退出小狼毫，释放词典和语言模型文件'
-    $quitProcess = Start-Process -FilePath $State.ExecutablePath -ArgumentList '/quit' -PassThru
+    $quitProcess = Start-WeaselProcess $State.ExecutablePath '/quit'
     # /quit 只发送退出请求，必须等待原服务进程退出，而不是等待命令进程。
     if (-not $State.Process.WaitForExit(15000)) {
         throw '小狼毫在 15 秒内未退出，已停止更新；请从开始菜单退出小狼毫后重试'
@@ -201,7 +211,7 @@ function Restore-WeaselServer($State) {
         $running = @(Get-Process -Name 'WeaselServer' -ErrorAction SilentlyContinue |
             Where-Object { $_.SessionId -eq $sessionId })
         if ($running.Count -gt 0) { return }
-        Start-Process -FilePath $State.ExecutablePath | Out-Null
+        Start-WeaselProcess $State.ExecutablePath | Out-Null
         Write-Log '已请求恢复小狼毫服务'
     } catch {
         Write-Warning "小狼毫未能自动恢复，请从开始菜单启动小狼毫。原始错误：$($_.Exception.Message)"
@@ -223,7 +233,8 @@ function Invoke-Redeploy([string]$InstallDir = '') {
     }
     if ($deployer) {
         Write-Log '正在重新部署小狼毫，请等待部署命令完成'
-        $deployment = Start-Process -FilePath $deployer.FullName -ArgumentList '/deploy' -Wait -PassThru
+        $deployment = Start-WeaselProcess $deployer.FullName '/deploy'
+        $deployment.WaitForExit()
         if ($deployment.ExitCode -ne 0) {
             throw "配置已写入，但小狼毫部署命令失败（退出码 $($deployment.ExitCode)），请手动重新部署"
         }

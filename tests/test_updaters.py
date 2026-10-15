@@ -14,6 +14,7 @@ LATEST = "20261004"
 FULL = f"fuyaorime-{LATEST}.zip"
 LATEST_URL = "https://github.com/skyrocketingHong/FuyaoRime/releases/latest"
 DOWNLOAD_URL = f"https://github.com/skyrocketingHong/FuyaoRime/releases/download/v{LATEST}/"
+POWERSHELL = (shutil.which("powershell") if os.name == "nt" else None) or shutil.which("pwsh")
 
 BASH_RUNNER = r'''
 args=("$FUYAORIME_FIXTURE/rime")
@@ -230,7 +231,7 @@ class UpdaterCases:
         if self.platform == "windows":
             runner = self.fixture / "runner.ps1"
             runner.write_text(POWERSHELL_RUNNER, encoding="utf-8-sig")
-            command = [shutil.which("pwsh"), "-NoProfile", "-File", str(runner)]
+            command = [POWERSHELL, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(runner)]
         elif self.platform == "android":
             command = ["/bin/bash", "-c", ANDROID_RUNNER]
         else:
@@ -500,7 +501,7 @@ class AndroidUpdaterTests(UpdaterCases, unittest.TestCase):
         self.assertFalse((self.fixture / "staging" / "fuyaorime-update-staging").exists())
 
 
-@unittest.skipUnless(shutil.which("pwsh"), "PowerShell is not installed")
+@unittest.skipUnless(POWERSHELL, "PowerShell is not installed")
 class WindowsUpdaterTests(UpdaterCases, unittest.TestCase):
     platform = "windows"
 
@@ -572,7 +573,7 @@ class WindowsUpdaterTests(UpdaterCases, unittest.TestCase):
         self.assertFalse((self.fixture / "server-running").exists())
 
 
-@unittest.skipUnless(shutil.which("pwsh"), "PowerShell is not installed")
+@unittest.skipUnless(POWERSHELL, "PowerShell is not installed")
 class WindowsWeaselHelperTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="fuyaorime process test-")
@@ -582,7 +583,7 @@ class WindowsWeaselHelperTests(unittest.TestCase):
         (self.fixture / "weasel" / "WeaselServer.exe").touch()
         (self.fixture / "weasel" / "WeaselDeployer.exe").touch()
 
-    def run_helper(self, body, success=True):
+    def run_helper(self, body, success=True, variables=None):
         runner = self.fixture / "runner.ps1"
         runner.write_text(
             "$ErrorActionPreference = 'Stop'\n"
@@ -591,13 +592,35 @@ class WindowsWeaselHelperTests(unittest.TestCase):
         )
         env = dict(os.environ, FUYAORIME_FIXTURE=str(self.fixture),
                    FUYAORIME_SCRIPT=str(ROOT / "updater" / "fuyaorime-update-windows.ps1"))
-        result = subprocess.run([shutil.which("pwsh"), "-NoProfile", "-File", str(runner)],
+        env.update(variables or {})
+        result = subprocess.run([POWERSHELL, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(runner)],
                                 env=env, capture_output=True, text=True, timeout=10)
         if success:
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         else:
             self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
         return result
+
+    def test_launcher_preserves_exact_argument_string(self):
+        executable = shutil.which("where.exe" if os.name == "nt" else "true")
+        if not executable:
+            self.skipTest("No suitable system process fixture is available")
+        self.run_helper(r'''
+foreach ($arguments in @('/quit', '/deploy', '')) {
+    $process = Start-WeaselProcess $Env:FUYAORIME_CHILD_EXE $arguments
+    try {
+        if ($process.StartInfo.Arguments -cne $arguments) { throw 'Argument string was changed' }
+        if ($process.StartInfo.FileName -cne $Env:FUYAORIME_CHILD_EXE) { throw 'Executable path was changed' }
+        if ($process.StartInfo.UseShellExecute) { throw 'Shell execution must be disabled' }
+        if ($process.StartInfo.WorkingDirectory -cne (Split-Path -Parent $Env:FUYAORIME_CHILD_EXE)) {
+            throw 'Unexpected working directory'
+        }
+        if (-not $process.WaitForExit(5000)) { $process.Kill(); throw 'Process fixture did not exit' }
+    } finally {
+        $process.Dispose()
+    }
+}
+''', variables={"FUYAORIME_CHILD_EXE": executable})
 
     def test_quit_waits_for_original_process_and_rejects_timeout(self):
         body = r'''
@@ -617,11 +640,9 @@ $controller | Add-Member -MemberType ScriptMethod -Name WaitForExit -Value {
     Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'events') 'wait-controller'
     return $controllerExited
 }
-function Start-Process {
-    param($FilePath, $ArgumentList, [switch]$Wait, [switch]$PassThru)
-    if ($ArgumentList -ne '/quit' -or $Wait -or -not $PassThru) {
-        throw 'Expected a nonblocking quit request returning its process'
-    }
+function Start-WeaselProcess {
+    param($ExecutablePath, $Arguments)
+    if ($Arguments -cne '/quit') { throw 'Expected an exact quit argument' }
     Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'events') 'quit'
     return $controller
 }
@@ -654,9 +675,10 @@ function Get-Process {
     if ($Id) { return [PSCustomObject]@{ SessionId = $session } }
     return $servers
 }
-function Start-Process {
-    param($FilePath)
-    Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'starts') $FilePath
+function Start-WeaselProcess {
+    param($ExecutablePath, $Arguments = '')
+    if ($Arguments -cne '') { throw 'Restore must not supply command arguments' }
+    Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'starts') $ExecutablePath
 }
 $state = [PSCustomObject]@{
     Process = [PSCustomObject]@{ HasExited = $false }
@@ -720,13 +742,16 @@ $next.Dispose()
 
     def test_deployment_waits_and_reports_unsuccessful_exit(self):
         body = r'''
-function Start-Process {
-    param($FilePath, $ArgumentList, [switch]$Wait, [switch]$PassThru)
-    if ($ArgumentList -ne '/deploy' -or -not $Wait -or -not $PassThru) {
-        throw 'Deployment must wait and collect its exit code'
+function Start-WeaselProcess {
+    param($ExecutablePath, $Arguments)
+    if ($Arguments -cne '/deploy') { throw 'Expected an exact deploy argument' }
+    Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'deployers') $ExecutablePath
+    $process = [PSCustomObject]@{ ExitCode = $null }
+    $process | Add-Member -MemberType ScriptMethod -Name WaitForExit -Value {
+        Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'deployers') 'wait-deployment'
+        $this.ExitCode = 0
     }
-    Add-Content (Join-Path $Env:FUYAORIME_FIXTURE 'deployers') $FilePath
-    return [PSCustomObject]@{ ExitCode = 0 }
+    return $process
 }
 Invoke-Redeploy (Join-Path $Env:FUYAORIME_FIXTURE 'weasel')
 '''
@@ -736,7 +761,7 @@ Invoke-Redeploy (Join-Path $Env:FUYAORIME_FIXTURE 'weasel')
                 self.run_helper(body if succeeded else body.replace("ExitCode = 0", "ExitCode = 1"),
                                 success=succeeded)
                 self.assertEqual((self.fixture / "deployers").read_text().splitlines(),
-                                 [str(self.fixture / "weasel" / "WeaselDeployer.exe")])
+                                 [str(self.fixture / "weasel" / "WeaselDeployer.exe"), "wait-deployment"])
 
 
 if __name__ == "__main__":
