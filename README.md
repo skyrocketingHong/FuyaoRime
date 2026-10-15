@@ -237,6 +237,8 @@ schtasks /Create /SC DAILY /ST 09:00 /TN "FuyaoRime Update" ^
 | macOS 皮肤 | [`overlay/squirrel.custom.yaml`](overlay/squirrel.custom.yaml) |
 | Windows 皮肤 | [`overlay/weasel.custom.yaml`](overlay/weasel.custom.yaml) |
 
+macOS 皮肤将系统 `AppleColorEmoji` 作为候选和注释的首选字体，使未带 Emoji 显示标记的符号也优先使用彩色字形，不改写候选和上屏字符。候选内容中的数字等字符也会受该优先级影响；输入编码和候选编号使用独立的文本字体。
+
 添加词库时，将 `.dict.yaml` 文件放入 `custom_dicts/`，并在 `rime_ice.custom.dict.yaml` 的 `import_tables` 中添加引用。定制其他方案时新增对应的 `<schema_id>.custom.yaml`，不要直接复制全拼的模糊音拼写规则到双拼方案。
 
 ## 同步与构建

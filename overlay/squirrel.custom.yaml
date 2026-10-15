@@ -66,11 +66,13 @@ patch:
     spacing: 0e+0
     shadow_size: 2e-1
     font_point: 16
-    font_face: "SF Pro Display, Noto Sans, Apple Color Emoji, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB, SimSun-ExtG, Segoe UI Symbol, Unifont"
+    # Emoji 字体须作为主字体，裸符号才不会按文本表现回退到 Unifont。
+    font_face: "AppleColorEmoji, SF Pro Display, Noto Sans, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB, SimSun-ExtG, Segoe UI Symbol, Unifont"
+    preedit_font_face: "SF Pro Display, Noto Sans, Apple Color Emoji, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB, SimSun-ExtG, Segoe UI Symbol, Unifont"
     label_font_point: 10
     label_font_face: "SF Compact Display"
     comment_font_point: 8
-    comment_font_face: "SF Pro Display, Noto Sans, Apple Color Emoji, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB, SimSun-ExtG, Segoe UI Symbol, Unifont"
+    comment_font_face: "AppleColorEmoji, SF Pro Display, Noto Sans, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB, SimSun-ExtG, Segoe UI Symbol, Unifont"
     horizontal: true
     color_scheme: citrus
     color_scheme_dark: citrus_dark
