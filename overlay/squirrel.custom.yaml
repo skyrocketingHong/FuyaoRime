@@ -67,13 +67,13 @@ patch:
     spacing: 0e+0
     shadow_size: 2e-1
     font_point: 16
-    # 文字字体保持正常空格宽度；Zapf Dingbats 在 Unifont 前承接勾号等单色符号。
-    font_face: "SF Pro Display, Noto Sans, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB, SimSun-ExtG, Segoe UI Symbol, AppleColorEmoji, ZapfDingbatsITC, Unifont"
-    preedit_font_face: "SF Pro Display, Noto Sans, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB, SimSun-ExtG, Segoe UI Symbol, AppleColorEmoji, ZapfDingbatsITC, Unifont"
+    # 文字字体保持正常空格宽度；符号优先使用 Zapf 和 Noto Symbols，Unifont 仅作最终缺字兜底。
+    font_face: "SF Pro Display, Noto Sans, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB, SimSun-ExtG, Segoe UI Symbol, AppleColorEmoji, ZapfDingbatsITC, NotoSansSymbols2-Regular, Unifont"
+    preedit_font_face: "SF Pro Display, Noto Sans, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB, SimSun-ExtG, Segoe UI Symbol, AppleColorEmoji, ZapfDingbatsITC, NotoSansSymbols2-Regular, Unifont"
     label_font_point: 10
-    label_font_face: "SF Compact Display, AppleColorEmoji, ZapfDingbatsITC"
+    label_font_face: "SF Compact Display, AppleColorEmoji, ZapfDingbatsITC, NotoSansSymbols2-Regular"
     comment_font_point: 8
-    comment_font_face: "SF Pro Display, Noto Sans, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB, SimSun-ExtG, Segoe UI Symbol, AppleColorEmoji, ZapfDingbatsITC, Unifont"
+    comment_font_face: "SF Pro Display, Noto Sans, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB, SimSun-ExtG, Segoe UI Symbol, AppleColorEmoji, ZapfDingbatsITC, NotoSansSymbols2-Regular, Unifont"
     horizontal: true
     color_scheme: citrus
     color_scheme_dark: citrus_dark
