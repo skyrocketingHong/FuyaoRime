@@ -8,7 +8,6 @@ fontFace:
   - url: NotoSansSymbols2-Regular.ttf
   - url: "NotoSansSymbols[wght].ttf"
   - url: Catrinity.otf
-  - url: "NotoSansBengali[wdth,wght].ttf"
   # 在此按需添加 Noto Sans SC、MiSans L3 等汉字字体，再放最终兜底。
   - url: unifont.otf
     ranges:

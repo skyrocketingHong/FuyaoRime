@@ -239,7 +239,7 @@ schtasks /Create /SC DAILY /ST 09:00 /TN "FuyaoRime Update" ^
 
 Windows 和 macOS 皮肤同步共用的文字、CJK 和符号后备字体，保留各自的 Emoji 字体、字体名称写法、字号与布局。正文以 `SF Pro Display` 为首选，编号以 `SF Compact Display` 为首选；未安装的字体由后续可用字体承接。macOS 的横排模板保留 `U+2006` 窄空格，普通空格使用正文主字体，不将 Emoji 字体放到首位。
 
-请按[字体清单和元书配置说明](FONTS.md)准备 `Noto Sans Symbols 2`、`Noto Sans Symbols`、`Catrinity` 和 `Noto Sans Bengali`，以补齐图形、数学、箭头和货币符号。原有 CJK 字体优先级保留，`Unifont` 定位为 CJK 缺字的最后兜底，不改写候选和上屏字符。字体不随配置包分发，未安装时覆盖结果会不同；鼠须管 1.1.2 不能在字体链中强制限定 Unicode 范围，元书则支持通过 `ranges` 限定。
+请按[字体清单和元书配置说明](FONTS.md)准备 `Noto Sans Symbols 2`、`Noto Sans Symbols` 和 `Catrinity`，以补齐图形、数学、箭头和货币符号。原有 CJK 字体优先级保留，`Unifont` 定位为 CJK 缺字的最后兜底；当前 U+09F3 塔卡符号仍是已知的非 CJK 回退例外。不改写候选和上屏字符。字体不随配置包分发，未安装时覆盖结果会不同；鼠须管 1.1.2 不能在字体链中强制限定 Unicode 范围，元书则支持通过 `ranges` 限定。
 
 添加词库时，将 `.dict.yaml` 文件放入 `custom_dicts/`，并在 `rime_ice.custom.dict.yaml` 的 `import_tables` 中添加引用。定制其他方案时新增对应的 `<schema_id>.custom.yaml`，不要直接复制全拼的模糊音拼写规则到双拼方案。
 

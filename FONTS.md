@@ -26,7 +26,6 @@ Apple 的[系统字体表](https://developer.apple.com/fonts/system-fonts/)列�
 | `Noto Sans Symbols 2` | 单色符号补充，例如 U+2700 黑色安全剪刀 | [官方 TTF](https://raw.githubusercontent.com/google/fonts/main/ofl/notosanssymbols2/NotoSansSymbols2-Regular.ttf)：`NotoSansSymbols2-Regular.ttf`；PostScript 名为 `NotoSansSymbols2-Regular`。不是彩色 Emoji 字体或 CJK 字体。 |
 | `Noto Sans Symbols` | 常用杂项符号、圈号、编号等补充 | [官方可变 TTF](https://raw.githubusercontent.com/google/fonts/main/ofl/notosanssymbols/NotoSansSymbols%5Bwght%5D.ttf)：`NotoSansSymbols[wght].ttf`；默认 Regular 的 PostScript 名为 `NotoSansSymbols-Regular`。与 Symbols 2 分工补字。 |
 | `Catrinity` | 技术、数学、箭头及较新 Unicode 符号补充 | [官方 OTF](https://catrinity-font.de/downloads/Catrinity.otf)：`Catrinity.otf`。采用 2.250 版；[官方更新记录](https://catrinity-font.de/versions.html)包含 Unicode 17 新增符号等扩展，不等于覆盖整个 Unicode。保留在系统 Emoji 和前序符号字体之后。 |
-| `Noto Sans Bengali` | 孟加拉文字及 U+09F3 孟加拉塔卡货币符号补充 | [官方可变 TTF](https://raw.githubusercontent.com/google/fonts/main/ofl/notosansbengali/NotoSansBengali%5Bwdth%2Cwght%5D.ttf)：`NotoSansBengali[wdth,wght].ttf`；默认 Regular 的 PostScript 名为 `NotoSansBengali-Regular`。 |
 | `Unifont` | 最终缺字兜底 | [GNU Unifont 官方入口](https://www.unifoundry.com/unifont/index.html)。在元书中可通过字符范围限制其参与 CJK 补字；具体覆盖取决于下载文件和版本。 |
 | `Noto Color Emoji Flags` | Windows 配置中的旗帜 Emoji 后备 | Google Noto Emoji 官方提供[旗帜专用 TTF](https://github.com/googlefonts/noto-emoji/blob/main/2D/fonts/NotoColorEmoji-flagsonly.ttf)，[命名脚本](https://github.com/googlefonts/noto-emoji/blob/main/update_flag_name.py)确认字体名为 `Noto Color Emoji Flags`。iPhone 优先使用系统 `AppleColorEmoji`，未验证该旗帜字体在元书中的彩色格式支持，不列为手机必装项。 |
 
@@ -77,12 +76,11 @@ fontFace:
   - url: NotoSansSymbols2-Regular.ttf
   - url: NotoSansSymbols[wght].ttf
   - url: Catrinity.otf
-  - url: NotoSansBengali[wdth,wght].ttf
 ```
 
 ### 将 Unifont 放在 CJK 范围的末尾
 
-建议从[完整字体配置片段](updater/ios-fonts.example.yaml)开始：它包含四款开放符号字体，并将 Unifont 基础字体和 Upper 字体分别限定到 BMP CJK、扩展 B 至 J、兼容表意文字及汉字结构描述符范围。该文件需要合并到已有皮肤的 `config.yaml`，不是独立的 `.cskin`，其中未准备的字体条目应删除。
+建议从[完整字体配置片段](updater/ios-fonts.example.yaml)开始：它包含三款开放符号字体，并将 Unifont 基础字体和 Upper 字体分别限定到 BMP CJK、扩展 B 至 J、兼容表意文字及汉字结构描述符范围。该文件需要合并到已有皮肤的 `config.yaml`，不是独立的 `.cskin`，其中未准备的字体条目应删除。
 
 在前面的正常文字、Emoji、符号和汉字字体之后，将下面条目追加到已有 `fontFace` 数组末尾。示例假定已把所选 GNU Unifont 基础 OTF 保存为 `fonts/unifont.otf`。
 
@@ -110,12 +108,12 @@ fontFace:
 
 | 字体链 | 非 CJK 文本回退到 Unifont | CJK 结构描述符回退到 Unifont | LastResort 或单码点零字形 |
 | --- | ---: | ---: | ---: |
-| 正文 `font_face` | 0 | 4 | 0 |
-| 注释 `comment_font_face` | 0 | 4 | 0 |
+| 正文 `font_face` | 1 | 4 | 0 |
+| 注释 `comment_font_face` | 1 | 4 | 0 |
 | 编号 `label_font_face` | 0 | 0 | 0 |
-| 预编辑配置 `preedit_font_face` | 0 | 4 | 0 |
+| 预编辑配置 `preedit_font_face` | 1 | 4 | 0 |
 
-四个 CJK 结构描述符是 U+2FFC、U+2FFD、U+2FFE、U+2FFF。16 pt 正文的双空格宽度为约 6.56 pt。鼠须管 1.1.2 实际不读取独立的 `preedit_font_face`，预编辑继承正文；表中该项核对的是预留配置字体链，不能视为此版本具有独立预编辑字体能力。
+当前唯一已测非 CJK 回退是 U+09F3 孟加拉塔卡货币符号，正文和注释由 Unifont 显示，编号字体链则由系统 `KohinoorBangla-Regular` 承接。四个 CJK 结构描述符是 U+2FFC、U+2FFD、U+2FFE、U+2FFF。16 pt 正文的双空格宽度为约 6.56 pt。鼠须管 1.1.2 实际不读取独立的 `preedit_font_face`，预编辑继承正文；表中该项核对的是预留配置字体链，不能视为此版本具有独立预编辑字体能力。
 
 本机 `SimSun-ExtG-Regular` 和 `Segoe UI Symbol` 未能解析，以上结果不依赖这两款字体。字体选择和字形存在性检查不等于逐字视觉检查，也不保证检查集之外的所有非 CJK 字符永远不会使用 Unifont。Windows 和 iPhone 元书尚未执行平台实测；桌面同步的是共用字体与回退顺序，平台 Emoji、SimSun 和 Zapf 的名称保留必要差异。
 

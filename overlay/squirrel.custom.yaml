@@ -68,12 +68,12 @@ patch:
     shadow_size: 2e-1
     font_point: 16
     # 符号字体先补齐非 CJK 缺字；宋体扩展字体加 Regular，避免被解析成普通宋体的字形样式。
-    font_face: "SF Pro Display, Noto Sans, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB-Regular, SimSun-ExtG-Regular, Segoe UI Symbol, AppleColorEmoji, ZapfDingbatsITC, Noto Sans Symbols 2, Noto Sans Symbols, Catrinity, Noto Sans Bengali, Unifont"
-    preedit_font_face: "SF Pro Display, Noto Sans, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB-Regular, SimSun-ExtG-Regular, Segoe UI Symbol, AppleColorEmoji, ZapfDingbatsITC, Noto Sans Symbols 2, Noto Sans Symbols, Catrinity, Noto Sans Bengali, Unifont"
+    font_face: "SF Pro Display, Noto Sans, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB-Regular, SimSun-ExtG-Regular, Segoe UI Symbol, AppleColorEmoji, ZapfDingbatsITC, Noto Sans Symbols 2, Noto Sans Symbols, Catrinity, Unifont"
+    preedit_font_face: "SF Pro Display, Noto Sans, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB-Regular, SimSun-ExtG-Regular, Segoe UI Symbol, AppleColorEmoji, ZapfDingbatsITC, Noto Sans Symbols 2, Noto Sans Symbols, Catrinity, Unifont"
     label_font_point: 10
-    label_font_face: "SF Compact Display, Noto Sans, AppleColorEmoji, ZapfDingbatsITC, Noto Sans Symbols 2, Noto Sans Symbols, Catrinity, Noto Sans Bengali"
+    label_font_face: "SF Compact Display, Noto Sans, AppleColorEmoji, ZapfDingbatsITC, Noto Sans Symbols 2, Noto Sans Symbols, Catrinity"
     comment_font_point: 8
-    comment_font_face: "SF Pro Display, Noto Sans, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB-Regular, SimSun-ExtG-Regular, Segoe UI Symbol, AppleColorEmoji, ZapfDingbatsITC, Noto Sans Symbols 2, Noto Sans Symbols, Catrinity, Noto Sans Bengali, Unifont"
+    comment_font_face: "SF Pro Display, Noto Sans, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB-Regular, SimSun-ExtG-Regular, Segoe UI Symbol, AppleColorEmoji, ZapfDingbatsITC, Noto Sans Symbols 2, Noto Sans Symbols, Catrinity, Unifont"
     horizontal: true
     color_scheme: citrus
     color_scheme_dark: citrus_dark
