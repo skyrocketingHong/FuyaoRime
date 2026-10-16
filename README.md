@@ -237,9 +237,9 @@ schtasks /Create /SC DAILY /ST 09:00 /TN "FuyaoRime Update" ^
 | macOS 皮肤 | [`overlay/squirrel.custom.yaml`](overlay/squirrel.custom.yaml) |
 | Windows 皮肤 | [`overlay/weasel.custom.yaml`](overlay/weasel.custom.yaml) |
 
-macOS 皮肤以 `SF Pro Display` 显示正文，以 `SF Compact Display` 显示编号，保持普通文字和空格的字宽。彩色 Emoji 使用后备字体 `AppleColorEmoji`；单色符号依次由 `ZapfDingbatsITC` 和 `NotoSansSymbols2-Regular` 承接。原有汉字后备字体继续优先使用，`Unifont` 留作最终缺字兜底，不改写候选和上屏字符。横排模板使用六分之一字宽空格（`U+2006`）控制编号、候选和注释之间的留白；鼠须管固定插入的候选间双空格使用正文主字体。
+Windows 和 macOS 皮肤同步共用的文字、CJK 和符号后备字体，保留各自的 Emoji 字体、字体名称写法、字号与布局。正文以 `SF Pro Display` 为首选，编号以 `SF Compact Display` 为首选；未安装的字体由后续可用字体承接。macOS 的横排模板保留 `U+2006` 窄空格，普通空格使用正文主字体，不将 Emoji 字体放到首位。
 
-需要安装 [Noto Sans Symbols 2](https://github.com/google/fonts/blob/main/ofl/notosanssymbols2/NotoSansSymbols2-Regular.ttf)，才能补齐 Zapf 未覆盖的符号，例如 U+2700 黑色安全剪刀。字体不随配置包分发，未安装时仍会回退到其他字体。`Unifont` 主要用于现有 CJK 字体缺字时的最后兜底；鼠须管 1.1.2 的字体链不支持按 Unicode 范围限制字体，因此无法保证它绝不参与其他未覆盖字符的显示。
+请按[字体清单和元书配置说明](FONTS.md)准备 `Noto Sans Symbols 2`、`Noto Sans Symbols`、`Catrinity` 和 `Noto Sans Bengali`，以补齐图形、数学、箭头和货币符号。原有 CJK 字体优先级保留，`Unifont` 定位为 CJK 缺字的最后兜底，不改写候选和上屏字符。字体不随配置包分发，未安装时覆盖结果会不同；鼠须管 1.1.2 不能在字体链中强制限定 Unicode 范围，元书则支持通过 `ranges` 限定。
 
 添加词库时，将 `.dict.yaml` 文件放入 `custom_dicts/`，并在 `rime_ice.custom.dict.yaml` 的 `import_tables` 中添加引用。定制其他方案时新增对应的 `<schema_id>.custom.yaml`，不要直接复制全拼的模糊音拼写规则到双拼方案。
 

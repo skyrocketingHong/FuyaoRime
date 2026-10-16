@@ -1,0 +1,31 @@
+# 合并到元书皮肤 config.yaml，保留原来的键盘布局配置。
+# url 对应皮肤 fonts/ 中的文件；未准备某个文件时删除对应条目。
+# 字重必须与所选文件匹配；手机端导入和范围生效仍需实际确认。
+fontFace:
+  - name: PingFangSC-Regular
+  - name: AppleColorEmoji
+  - name: ZapfDingbatsITC
+  - url: NotoSansSymbols2-Regular.ttf
+  - url: "NotoSansSymbols[wght].ttf"
+  - url: Catrinity.otf
+  - url: "NotoSansBengali[wdth,wght].ttf"
+  # 在此按需添加 Noto Sans SC、MiSans L3 等汉字字体，再放最终兜底。
+  - url: unifont.otf
+    ranges:
+      - {location: 12272, length: 16}     # U+2FF0–2FFF，汉字结构描述符
+      - {location: 13312, length: 6592}   # U+3400–4DBF，扩展 A
+      - {location: 19968, length: 20992}  # U+4E00–9FFF，统一表意文字
+      - {location: 63744, length: 512}    # U+F900–FAFF，兼容表意文字
+  - url: unifont_upper.otf
+    ranges:
+      - {location: 131072, length: 42720} # U+20000–2A6DF，扩展 B
+      - {location: 173824, length: 4160}  # U+2A700–2B73F，扩展 C
+      - {location: 177984, length: 224}   # U+2B740–2B81F，扩展 D
+      - {location: 178208, length: 5776}  # U+2B820–2CEAF，扩展 E
+      - {location: 183984, length: 7488}  # U+2CEB0–2EBEF，扩展 F
+      - {location: 191472, length: 624}   # U+2EBF0–2EE5F，扩展 I
+      - {location: 194560, length: 544}   # U+2F800–2FA1F，兼容表意文字补充
+      - {location: 196608, length: 4944}  # U+30000–3134F，扩展 G
+      - {location: 201552, length: 4192}  # U+31350–323AF，扩展 H
+      - {location: 205744, length: 4304}  # U+323B0–3347F，扩展 J
+# 范围按 Unicode 17 定义，只限定允许补字的区域，不保证字体包含区间内全部字形。
