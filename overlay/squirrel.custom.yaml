@@ -48,7 +48,8 @@ patch:
       name: "柑橘黄色·暗 (Citrus Dark)"
   style:
     status_message_type: mix
-    candidate_format: '[label]. [candidate] [comment]'
+    # 仅收窄模板内部留白；横排候选间的两个空格由鼠须管固定插入。
+    candidate_format: "[label].\u2006[candidate]\u2006[comment]"
     candidate_list_layout: linear
     text_orientation: horizontal
     inline_preedit: true
@@ -68,9 +69,9 @@ patch:
     font_point: 16
     # Emoji 字体须作为主字体，裸符号才不会按文本表现回退到 Unifont。
     font_face: "AppleColorEmoji, SF Pro Display, Noto Sans, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB, SimSun-ExtG, Segoe UI Symbol, Unifont"
-    preedit_font_face: "SF Pro Display, Noto Sans, Apple Color Emoji, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB, SimSun-ExtG, Segoe UI Symbol, Unifont"
+    preedit_font_face: "AppleColorEmoji, SF Pro Display, Noto Sans, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB, SimSun-ExtG, Segoe UI Symbol, Unifont"
     label_font_point: 10
-    label_font_face: "SF Compact Display"
+    label_font_face: "AppleColorEmoji, SF Compact Display"
     comment_font_point: 8
     comment_font_face: "AppleColorEmoji, SF Pro Display, Noto Sans, PingFang SC, Noto Sans SC, MiSans L3, SimSun-ExtB, SimSun-ExtG, Segoe UI Symbol, Unifont"
     horizontal: true
