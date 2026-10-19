@@ -78,15 +78,38 @@ jobs:
         run: python3 scripts/fetch_radical_readings.py
 
       - name: Download wanxiang grammar
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
         run: |
           mkdir -p upstream/wanxiang
-          curl -L -o upstream/wanxiang/wanxiang-lts-zh-hans.gram \
+          gh api repos/amzxyz/RIME-LMDG/releases/tags/LTS > upstream/wanxiang/release.json
+          WANXIANG_VERSION=$(python3 - <<'PYTHON'
+          import datetime, json
+          with open('upstream/wanxiang/release.json') as handle:
+              data = json.load(handle)
+          assets = data.get('assets') if isinstance(data, dict) else None
+          if not isinstance(assets, list):
+              raise SystemExit('万象 LTS 元数据缺少有效的 assets 列表')
+          matches = [asset for asset in assets if isinstance(asset, dict)
+                     and asset.get('name') == 'wanxiang-lts-zh-hans.gram']
+          if len(matches) != 1:
+              raise SystemExit('万象 LTS 必须包含唯一的 wanxiang-lts-zh-hans.gram')
+          try:
+              updated = datetime.datetime.strptime(matches[0].get('updated_at'), '%Y-%m-%dT%H:%M:%SZ')
+          except (TypeError, ValueError):
+              raise SystemExit('万象模型 updated_at 缺失或无效')
+          beijing = datetime.timezone(datetime.timedelta(hours=8))
+          print(updated.replace(tzinfo=datetime.timezone.utc).astimezone(beijing).strftime('%Y%m%d'))
+          PYTHON
+          )
+          curl -fL --retry 3 -o upstream/wanxiang/wanxiang-lts-zh-hans.gram \
             "https://github.com/amzxyz/RIME-LMDG/releases/download/LTS/wanxiang-lts-zh-hans.gram"
-          curl -s "https://api.github.com/repos/amzxyz/RIME-LMDG/releases/tags/LTS" | \
-            python3 -c "import sys,json; data=json.load(sys.stdin); \
-            assets=[a for a in data['assets'] if a['name']=='wanxiang-lts-zh-hans.gram']; \
-            print(assets[0]['updated_at'].split('T')[0].replace('-','') if assets else '')" \
-            > upstream/wanxiang/version.txt
+          if [ ! -s upstream/wanxiang/wanxiang-lts-zh-hans.gram ]; then
+            echo '万象模型下载结果为空' >&2
+            exit 1
+          fi
+          printf '%s\n' "$WANXIANG_VERSION" > upstream/wanxiang/version.txt
 
       - name: Restore custom_dicts from previous package
         # 词库不入库：从上一版全量包恢复起点，"本地版本新于远端则跳过"
