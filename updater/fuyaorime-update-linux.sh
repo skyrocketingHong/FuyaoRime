@@ -117,6 +117,65 @@ assert_safe_target() {
     done
 }
 
+set_classicui_key() {
+    # set_classicui_key <file> <key> <value>：键存在则整行替换，否则追加。
+    # 不用 sed -i，兼容测试环境和 BSD 工具链。
+    local file="$1" key="$2" value="$3" tmp
+    if grep -q "^${key}=" "$file" 2>/dev/null; then
+        tmp="${file}.fuyaorime.tmp"
+        awk -v key="$key" -v value="$value" '
+            index($0, key "=") == 1 { print key "=" value; replaced = 1; next }
+            { print }
+            END { if (!replaced) print key "=" value }' "$file" > "$tmp" \
+            && cat "$tmp" > "$file" && rm -f "$tmp"
+    else
+        printf '%s=%s\n' "$key" "$value" >> "$file"
+    fi
+}
+
+# classicui.conf 为顶层键值文件；仅管理 Theme/DarkTheme/UseDarkTheme，
+# 用户自选的非 fuyaorime 主题保持原样，仅在全新配置时开启跟随系统明暗。
+configure_classicui_theme() {
+    local conf="$1/classicui.conf" existed=0 theme="" dark="" target="fuyaorime-citrus"
+    if [ -f "$conf" ]; then
+        existed=1
+        theme=$(sed -n 's/^Theme=//p' "$conf" | tail -n 1 | tr -d '\r')
+        dark=$(sed -n 's/^DarkTheme=//p' "$conf" | tail -n 1 | tr -d '\r')
+    fi
+    if [ -n "$theme" ] && [ "${theme#fuyaorime-}" = "$theme" ]; then
+        log "fcitx5 使用自定义主题 ${theme}，保持不变"
+        return 0
+    fi
+    mkdir -p "$1"
+    set_classicui_key "$conf" "Theme" "$target"
+    if [ -z "$dark" ] || [ "${dark#fuyaorime-}" != "$dark" ]; then
+        set_classicui_key "$conf" "DarkTheme" "${target}-dark"
+    fi
+    if [ "$existed" -eq 0 ]; then
+        set_classicui_key "$conf" "UseDarkTheme" "True"
+    fi
+    log "fcitx5 已启用皮肤 ${target}（暗色 ${target}-dark）"
+}
+
+# 将配置包内的 fcitx5 主题安装到用户主题目录，供 fcitx5-rime 复刻桌面端配色；
+# 仅检测到 fcitx5 时执行，ibus-rime 的候选窗跟随系统主题，无法由 Rime 配置定制。
+install_fcitx5_theme() {
+    [ -d "$RIME_DIR/fcitx5-themes" ] || return 0
+    local data_home="${XDG_DATA_HOME:-$HOME/.local/share}" config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+    if [ ! -d "$data_home/fcitx5" ] && [ ! -d "$config_home/fcitx5" ]; then
+        return 0
+    fi
+    local theme_dir="$data_home/fcitx5/themes" theme
+    mkdir -p "$theme_dir"
+    for theme in "$RIME_DIR/fcitx5-themes"/*; do
+        [ -d "$theme" ] || continue
+        rm -rf "${theme_dir:?}/${theme##*/}"
+        cp -r "$theme" "$theme_dir/"
+    done
+    log "已安装 FuyaoRime fcitx5 皮肤（薄荷绿、柑橘黄及暗色变体）"
+    configure_classicui_theme "$config_home/fcitx5/conf"
+}
+
 extract_package() {
     local path
     log "正在检查配置包路径"
@@ -184,6 +243,7 @@ main() {
     current=$(cat "$MARKER" 2>/dev/null || true)
     if [ "$current" = "$latest" ]; then
         log "已是最新版本 $latest"
+        install_fcitx5_theme || log "fcitx5 皮肤安装失败，输入法配置不受影响"
         return 0
     fi
     if valid_version "$current" && [[ "$(version_key "$current")" > "$(version_key "$latest")" ]]; then
@@ -206,6 +266,7 @@ main() {
     fi
 
     printf '%s\n' "$latest" > "$MARKER"
+    install_fcitx5_theme || log "fcitx5 皮肤安装失败，输入法配置不受影响"
     redeploy
 }
 

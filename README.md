@@ -14,7 +14,7 @@ FuyaoRime 将[雾凇拼音](https://github.com/iDvel/rime-ice)、[万象语言�
 
 - 保留全拼、七种双拼、九键、部件拆字和英文方案。
 - 全拼加入万象语言模型、扩展词库、模糊音，以及带调注音的拆字混输。
-- macOS 和 Windows 提供薄荷绿、柑橘黄皮肤，含明暗变体。
+- macOS、Windows 和 Linux fcitx5-rime 提供薄荷绿、柑橘黄皮肤，含明暗变体。
 - 提供四平台更新脚本和元书快捷指令。
 
 ## 安装
@@ -63,6 +63,8 @@ bash "$HOME/bin/fuyaorime-update-macos.sh"
 ### Linux
 
 需要 Bash、`curl` 和 `unzip`。脚本会尝试重启 fcitx5 或 ibus；定时任务中无法自动部署时，手动重新部署一次。
+
+检测到 fcitx5 时，脚本随配置包安装薄荷绿、柑橘黄主题到 `~/.local/share/fcitx5/themes/`，并在 `classicui.conf` 启用柑橘黄（明暗自动跟随系统）。`classicui.conf` 已有其他主题时保留用户选择；ibus-rime 的候选窗跟随系统主题，不受此影响。
 
 ```bash
 mkdir -p "$HOME/bin" "$HOME/.local/state"
@@ -196,6 +198,7 @@ schtasks /Create /SC DAILY /ST 09:00 /TN "FuyaoRime Update" ^
 | 拆字混输实现 | [fuyao_radical.lua](overlay/lua/fuyao_radical.lua) |
 | macOS 皮肤 | [squirrel.custom.yaml](overlay/squirrel.custom.yaml) |
 | Windows 皮肤 | [weasel.custom.yaml](overlay/weasel.custom.yaml) |
+| Linux fcitx5 皮肤 | [fcitx5-themes](overlay/fcitx5-themes) |
 
 字体顺序、下载和元书对应设置见 [FONTS.md](FONTS.md)。添加词库时，将 `.dict.yaml` 放入 `custom_dicts/`，并在 `rime_ice.custom.dict.yaml` 的 `import_tables` 中引用；其他方案使用各自的 `<schema_id>.custom.yaml`。
 

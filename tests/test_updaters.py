@@ -17,6 +17,10 @@ DOWNLOAD_URL = f"https://github.com/skyrocketingHong/FuyaoRime/releases/download
 POWERSHELL = (shutil.which("powershell") if os.name == "nt" else None) or shutil.which("pwsh")
 
 BASH_RUNNER = r'''
+export HOME="$FUYAORIME_FIXTURE/home"
+mkdir -p "$HOME"
+export XDG_DATA_HOME="$HOME/.local/share"
+export XDG_CONFIG_HOME="$HOME/.config"
 args=("$FUYAORIME_FIXTURE/rime")
 if [ -n "$FUYAORIME_PROXY" ]; then args+=(--github-proxy "$FUYAORIME_PROXY"); fi
 source "$FUYAORIME_SCRIPT" "${args[@]}"
@@ -465,6 +469,85 @@ class MacOSUpdaterTests(UpdaterCases, unittest.TestCase):
 
 class LinuxUpdaterTests(UpdaterCases, unittest.TestCase):
     platform = "linux"
+
+    THEME_FILES = {
+        "fcitx5-themes/fuyaorime-citrus/theme.conf": "[Metadata]\nName=FuyaoRime 柑橘黄\n",
+        "fcitx5-themes/fuyaorime-citrus-dark/theme.conf": "[Metadata]\nName=FuyaoRime 柑橘黄·暗\n",
+    }
+
+    def setUp(self):
+        super().setUp()
+        self.home = self.fixture / "home"
+        self.archive(FULL, {"config.yaml": "full", "added.yaml": "new", **self.THEME_FILES})
+
+    def fcitx5_home(self):
+        # 仅有 fcitx5 用户目录即视为 fcitx5-rime 环境，主题随之安装。
+        data = self.home / ".local/share/fcitx5"
+        data.mkdir(parents=True)
+        return data
+
+    def theme_diff(self):
+        files = {"INCREMENTAL-README.txt": (
+            f"FuyaoRime 增量更新包\n\n适用版本: 20261003 -> {LATEST}\n\n"
+            "以下 1 个文件已从配置包移除，可手动删除（不删除一般不影响使用）:\n"
+            "  - obsolete.yaml\n"), "config.yaml": "diff", **self.THEME_FILES}
+        name = f"fuyaorime-{LATEST}-diff-from-20261003.zip"
+        self.archive(name, files)
+        return name
+
+    def classicui(self):
+        return self.home / ".config/fcitx5/conf/classicui.conf"
+
+    def test_full_update_installs_and_enables_fcitx5_theme(self):
+        self.fcitx5_home()
+        self.marker.unlink()
+        self.run_update()
+        themes = self.home / ".local/share/fcitx5/themes"
+        for theme in self.THEME_FILES:
+            self.assertEqual(
+                (themes / theme.split("/", 1)[1]).read_text(),
+                self.THEME_FILES[theme])
+        self.assertEqual(
+            self.classicui().read_text(),
+            "Theme=fuyaorime-citrus\nDarkTheme=fuyaorime-citrus-dark\nUseDarkTheme=True\n")
+
+    def test_diff_update_installs_fcitx5_theme(self):
+        self.fcitx5_home()
+        self.theme_diff()
+        self.run_update()
+        self.assertTrue(
+            (self.home / ".local/share/fcitx5/themes/fuyaorime-citrus/theme.conf").exists())
+        self.assertIn("Theme=fuyaorime-citrus\n", self.classicui().read_text())
+
+    def test_fcitx5_theme_preserves_user_selected_theme(self):
+        self.fcitx5_home()
+        conf = self.classicui()
+        conf.parent.mkdir(parents=True)
+        conf.write_text("Theme=material-color\nDarkTheme=material-color-dark\nUseDarkTheme=True\n")
+        self.marker.unlink()
+        self.run_update()
+        # 主题文件照常安装，但 classicui 保持用户自选主题。
+        self.assertTrue(
+            (self.home / ".local/share/fcitx5/themes/fuyaorime-citrus/theme.conf").exists())
+        self.assertEqual(conf.read_text(),
+                         "Theme=material-color\nDarkTheme=material-color-dark\nUseDarkTheme=True\n")
+
+    def test_fcitx5_theme_keeps_user_dark_mode_choice(self):
+        self.fcitx5_home()
+        conf = self.classicui()
+        conf.parent.mkdir(parents=True)
+        conf.write_text("Theme=fuyaorime-bohelv\nUseDarkTheme=False\nVertical Candidate List=True\n")
+        self.marker.unlink()
+        self.run_update()
+        self.assertEqual(
+            conf.read_text(),
+            "Theme=fuyaorime-citrus\nUseDarkTheme=False\nVertical Candidate List=True\n"
+            "DarkTheme=fuyaorime-citrus-dark\n")
+
+    def test_theme_install_skipped_without_fcitx5(self):
+        self.run_update()
+        self.assertFalse((self.home / ".local/share/fcitx5").exists())
+        self.assertFalse((self.home / ".config/fcitx5").exists())
 
 
 class AndroidUpdaterTests(UpdaterCases, unittest.TestCase):

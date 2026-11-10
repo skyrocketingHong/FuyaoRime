@@ -83,6 +83,11 @@ if [ -d "$OVERLAY_DIR" ]; then
         mkdir -p "$OUTPUT_DIR/lua"
         cp "$OVERLAY_DIR/lua"/*.lua "$OUTPUT_DIR/lua/" 2>/dev/null || true
     fi
+
+    # 复制 fcitx5 主题，由 Linux 更新脚本从配置包安装到 fcitx5 主题目录
+    if [ -d "$OVERLAY_DIR/fcitx5-themes" ]; then
+        cp -r "$OVERLAY_DIR/fcitx5-themes" "$OUTPUT_DIR/"
+    fi
 fi
 
 # 5. 清理不需要的文件
