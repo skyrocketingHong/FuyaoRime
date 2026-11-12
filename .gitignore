@@ -48,3 +48,8 @@ AGENTS.md
 # 虚拟环境
 .venv/
 venv/
+
+# ZCode plugin local state
+.mimosa/
+.v2c/
+.video_agent/
