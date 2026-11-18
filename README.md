@@ -43,7 +43,15 @@ FuyaoRime 将[雾凇拼音](https://github.com/iDvel/rime-ice)、[万象语言�
 
 ### 从雾凇拼音全拼升级
 
-升级前可在 Rime 客户端同步用户资料，备份同步目录中的 `rime_ice.userdb.txt`。覆盖配置并重新部署后，切换到“Fuyao Rime”，即可继续使用原来的 `rime_ice.userdb`。在新设备恢复时，先启用“Fuyao Rime”，再通过客户端导入快照或从同步目录恢复，保留备份文件原名。
+全拼的个人词库已改为 `fuyao_rime.userdb`。可通过以下步骤迁移旧词条和词频，原有 `rime_ice.userdb` 仍供九键和双拼使用。
+
+1. 在 Rime 客户端同步用户资料，将 `rime_ice.userdb.txt` 复制到电脑上的备份目录。已有快照可跳过同步。
+2. 用 Python 3 运行下方命令。脚本会在备份旁新建目录，生成 `fuyao_rime.userdb.txt` 并输出路径。[下载迁移脚本](https://raw.githubusercontent.com/skyrocketingHong/FuyaoRime/main/updater/migrate_user_dict.py)
+3. 更新配置并重新部署，切换到“Fuyao Rime”输入一次。通过客户端恢复转换后的快照，或把快照放到同步目录下的一个新子目录，再执行用户资料同步。保留旧库和旧快照，以便回滚。
+
+```bash
+python3 migrate_user_dict.py "/path/to/rime_ice.userdb.txt"
+```
 
 全拼方案 ID 已改为 `fuyao_rime`。如果改过方案列表，请将其中的 `rime_ice` 改为 `fuyao_rime`。原 `rime_ice.custom.yaml` 中自行添加的设置可合并到 `fuyao_rime.custom.yaml`。
 

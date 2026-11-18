@@ -17,7 +17,7 @@ if [ ! -s "$READINGS_FILE" ]; then
     exit 1
 fi
 
-# 上游方案含带制表符的标量，仅替换方案声明和引用，保留其余 YAML 原文。
+# 上游方案含带制表符的标量，按行修改方案声明、引用及九键词库名，保留其余 YAML 原文。
 # 若上游结构变化，在清理上一次输出前停止。
 SCHEMA_DIR="$(mktemp -d)"
 trap 'rm -rf "$SCHEMA_DIR"' EXIT
@@ -34,6 +34,7 @@ changes = {
     }),
     "t9.schema.yaml": ("t9.schema.yaml", {
         r"^__include: rime_ice\.schema\.yaml:/": "__include: fuyao_rime.schema.yaml:/",
+        r"^(  prism: t9)$": r"\1\n  user_dict: rime_ice",
     }),
     "default.yaml": ("default.yaml", {
         r"^  - schema: rime_ice[ \t]*(?:#.*)?$": "  - schema: fuyao_rime             # Fuyao Rime（全拼）",

@@ -25,6 +25,11 @@ upstream/
 output/
 custom_dicts/
 
+# Rime 用户数据
+*.userdb
+*.userdb.txt
+fuyaorime-migration-*/
+
 # 构建产物
 *.zip
 *.tar.gz

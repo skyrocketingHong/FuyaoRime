@@ -65,7 +65,7 @@ class ReadingResourceTests(unittest.TestCase):
             for name in schemas + ["radical_pinyin"]:
                 (upstream / f"{name}.schema.yaml").write_text(f"schema:\n  schema_id: {name}\n")
             pinyin = "schema:\n  schema_id: rime_ice\n  name: 雾凇拼音\npin_cand_filter:\n  - d\t的\n"
-            t9 = "__include: rime_ice.schema.yaml:/\nschema:\n  schema_id: t9\n"
+            t9 = "__include: rime_ice.schema.yaml:/\nschema:\n  schema_id: t9\ntranslator:\n  prism: t9\n"
             (upstream / "rime_ice.schema.yaml").write_text(pinyin)
             (upstream / "t9.schema.yaml").write_text(t9)
             (upstream / "default.yaml").write_text("schema_list:\n  - schema: rime_ice\n  - schema: t9\n")
@@ -86,10 +86,11 @@ class ReadingResourceTests(unittest.TestCase):
                              pinyin.replace("schema_id: rime_ice", "schema_id: fuyao_rime")
                              .replace("name: 雾凇拼音", "name: Fuyao Rime"))
             self.assertEqual((output / "t9.schema.yaml").read_text(),
-                             t9.replace("rime_ice.schema.yaml", "fuyao_rime.schema.yaml"))
+                             t9.replace("rime_ice.schema.yaml", "fuyao_rime.schema.yaml")
+                             .replace("  prism: t9\n", "  prism: t9\n  user_dict: rime_ice\n"))
             self.assertIn("- schema: fuyao_rime", (output / "default.yaml").read_text())
             self.assertIn("  fuyao_rime.schema.yaml\n  rime_ice.dict.yaml", (output / "recipe.yaml").read_text())
-            self.assertIn(b'"translator/user_dict": rime_ice', (output / patch.name).read_bytes())
+            self.assertIn(b'"translator/user_dict": fuyao_rime', (output / patch.name).read_bytes())
             for name in schemas:
                 filename = f"{name}.schema.yaml"
                 self.assertEqual((output / filename).read_bytes(), (upstream / filename).read_bytes())

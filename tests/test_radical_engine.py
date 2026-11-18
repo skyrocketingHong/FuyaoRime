@@ -85,16 +85,17 @@ class RadicalEngineTests(unittest.TestCase):
         rows = self.baseline if baseline else self.results
         return next(row["candidates"] for row in rows if row.get("input") == input_text)
 
-    def test_renamed_schema_and_t9_deploy_with_the_original_user_dict(self):
+    def test_full_pinyin_and_t9_use_their_own_user_dicts(self):
         import yaml
 
         main = yaml.safe_load((self.user / "build/fuyao_rime.schema.yaml").read_text())
         t9 = yaml.safe_load((self.user / "build/t9.schema.yaml").read_text())
         self.assertEqual(main["schema"]["name"], "Fuyao Rime")
-        self.assertEqual(main["translator"]["user_dict"], "rime_ice")
+        self.assertEqual(main["translator"]["user_dict"], "fuyao_rime")
         self.assertEqual(t9["schema"]["schema_id"], "t9")
         self.assertEqual(t9["translator"]["prism"], "t9")
-        self.assertTrue((self.user / "rime_ice.userdb").exists())
+        self.assertEqual(t9["translator"]["user_dict"], "rime_ice")
+        self.assertTrue((self.user / "fuyao_rime.userdb").exists())
 
     def test_mamama_keeps_top_three_and_inserts_tone_marked_radicals(self):
         before = self.candidates("mamama", baseline=True)
