@@ -1,7 +1,7 @@
 <h1 align="center">FuyaoRime</h1>
 
 <p align="center">
-  基于雾凇拼音、万象语言模型与扩展词库的 Rime 配置，每日自动同步发布
+  每日自动同步发布的 Rime 配置，整合万象语言模型与扩展词库
 </p>
 
 <p align="center">
@@ -10,7 +10,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="GPL-3.0"></a>
 </p>
 
-FuyaoRime 将[雾凇拼音](https://github.com/iDvel/rime-ice)、[万象语言模型](https://github.com/amzxyz/RIME-LMDG)和扩展词库合并为配置包，供鼠须管、小狼毫、Linux Rime、小企鹅输入法及元书使用。
+Fuyao Rime 供鼠须管、小狼毫、Linux Rime、小企鹅输入法及元书使用。
 
 - 保留全拼、七种双拼、九键、部件拆字和英文方案。
 - 全拼加入万象语言模型、扩展词库、模糊音，以及带调注音的拆字混输。
@@ -41,19 +41,19 @@ FuyaoRime 将[雾凇拼音](https://github.com/iDvel/rime-ice)、[万象语言�
 
 手动覆盖配置后删除 `fuyaorime-version.txt`，让更新脚本下次使用全量包重建版本基线。
 
-### 从雾凇拼音全拼升级
+### 升级与个人词库迁移
 
-全拼的个人词库已改为 `fuyao_rime.userdb`。可通过以下步骤迁移旧词条和词频，原有 `rime_ice.userdb` 仍供九键和双拼使用。
+全拼、九键和七种双拼共用 `fuyao_rime.userdb`。恢复旧词条和词频时，先转换旧版快照。已有 `fuyao_rime.userdb.txt` 快照可直接恢复。
 
-1. 在 Rime 客户端同步用户资料，将 `rime_ice.userdb.txt` 复制到电脑上的备份目录。已有快照可跳过同步。
+1. 在 Rime 客户端同步用户资料，将旧版 `.userdb.txt` 快照复制到电脑上的备份目录。
 2. 用 Python 3 运行下方命令。脚本会在备份旁新建目录，生成 `fuyao_rime.userdb.txt` 并输出路径。[下载迁移脚本](https://raw.githubusercontent.com/skyrocketingHong/FuyaoRime/main/updater/migrate_user_dict.py)
 3. 更新配置并重新部署，切换到“Fuyao Rime”输入一次。通过客户端恢复转换后的快照，或把快照放到同步目录下的一个新子目录，再执行用户资料同步。保留旧库和旧快照，以便回滚。
 
 ```bash
-python3 migrate_user_dict.py "/path/to/rime_ice.userdb.txt"
+python3 migrate_user_dict.py "/path/to/backup.userdb.txt"
 ```
 
-全拼方案 ID 已改为 `fuyao_rime`。如果改过方案列表，请将其中的 `rime_ice` 改为 `fuyao_rime`。原 `rime_ice.custom.yaml` 中自行添加的设置可合并到 `fuyao_rime.custom.yaml`。
+如自定义过方案列表，将全拼的方案 ID 设为 `fuyao_rime`。个人补丁可合并到 `fuyao_rime.custom.yaml`，基础词库引用使用 `fuyao_rime`。
 
 ## 自动更新
 
@@ -199,7 +199,7 @@ schtasks /Create /SC DAILY /ST 09:00 /TN "FuyaoRime Update" ^
 
 额外词库包括中文维基百科、维基文库、维基词典、萌娘百科、网络俚语、中国地名、流行新词、中文人名、成语俗语、古诗词名句和唐诗三百首。
 
-语言模型、额外词库、模糊音和拆字混输用于全拼，双拼保持上游配置。英文方案共用三字母小写派生，例如输入 `ios` 可匹配 `iOS`。标点按全角处理，输入网址或代码时可切换英文模式。
+语言模型、额外词库、模糊音和拆字混输用于全拼，双拼沿用各自的拼写规则。英文方案共用三字母小写派生，例如输入 `ios` 可匹配 `iOS`。标点按全角处理，输入网址或代码时可切换英文模式。
 
 全拼可直接输入部件拼音，例如 `mamama` 得到骉、驫及词典收录的带调读音，也支持 `ma'ma'ma` 和原有的 `uUmamama` 反查。普通候选前三项优先，随后最多插入两个完整匹配的拆字候选；同码先排有注音的字，再优先基本汉字区，结果去重。不做拆字补全、造句或用户词频学习，未收录读音时标注“拆字”。
 
@@ -207,14 +207,14 @@ schtasks /Create /SC DAILY /ST 09:00 /TN "FuyaoRime Update" ^
 | --- | --- |
 | 启用方案、标点 | [default.custom.yaml](overlay/default.custom.yaml) |
 | 全拼模型、模糊音、拆字设置 | [fuyao_rime.custom.yaml](overlay/fuyao_rime.custom.yaml) |
-| 额外词库引用 | [rime_ice.custom.dict.yaml](overlay/rime_ice.custom.dict.yaml) |
+| 额外词库引用 | [fuyao_rime.custom.dict.yaml](overlay/fuyao_rime.custom.dict.yaml) |
 | 英文派生 | [melt_eng.custom.yaml](overlay/melt_eng.custom.yaml) |
 | 拆字混输实现 | [fuyao_radical.lua](overlay/lua/fuyao_radical.lua) |
 | macOS 皮肤 | [squirrel.custom.yaml](overlay/squirrel.custom.yaml) |
 | Windows 皮肤 | [weasel.custom.yaml](overlay/weasel.custom.yaml) |
 | Linux fcitx5 皮肤 | [fcitx5-themes](overlay/fcitx5-themes) |
 
-字体顺序、下载和元书对应设置见 [FONTS.md](FONTS.md)。添加词库时，将 `.dict.yaml` 放入 `custom_dicts/`，并在 `rime_ice.custom.dict.yaml` 的 `import_tables` 中引用；其他方案使用各自的 `<schema_id>.custom.yaml`。
+字体顺序、下载和元书对应设置见 [FONTS.md](FONTS.md)。添加词库时，将 `.dict.yaml` 放入 `custom_dicts/`，并在 `fuyao_rime.custom.dict.yaml` 的 `import_tables` 中引用；其他方案使用各自的 `<schema_id>.custom.yaml`。
 
 ## 同步与构建
 
@@ -228,7 +228,7 @@ schtasks /Create /SC DAILY /ST 09:00 /TN "FuyaoRime Update" ^
 ```bash
 git clone https://github.com/skyrocketingHong/FuyaoRime.git
 cd FuyaoRime
-git clone --depth 1 https://github.com/iDvel/rime-ice.git upstream/rime-ice
+git clone --depth 1 https://github.com/iDvel/rime-ice.git upstream/base
 python3 scripts/fetch_radical_readings.py
 
 mkdir -p upstream/wanxiang
@@ -255,7 +255,7 @@ python3 -m unittest discover -s tests -p 'test_radical_readings.py' -v
 
 ## 来源与许可
 
-- [雾凇拼音](https://github.com/iDvel/rime-ice)：基础配置和词库。
+- 基础配置和词库由 Dvel 及其贡献者维护。[来源](https://github.com/iDvel/rime-ice)
 - [部件拆字](https://github.com/mirtlecn/rime-radical-pinyin)：拆字词库与带调注音。
 - [万象拼音](https://github.com/amzxyz/rime_wanxiang)、[万象语言模型](https://github.com/amzxyz/RIME-LMDG)。
 - [fcitx5-pinyin-zhwiki](https://github.com/felixonmars/fcitx5-pinyin-zhwiki)、[Wikimedia Dumps](https://dumps.wikimedia.org/)：维基系词库。

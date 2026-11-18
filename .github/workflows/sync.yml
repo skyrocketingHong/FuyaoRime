@@ -70,9 +70,9 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Clone rime-ice
+      - name: Fetch base configuration
         run: |
-          git clone --depth 1 https://github.com/iDvel/rime-ice.git upstream/rime-ice
+          git clone --depth 1 https://github.com/iDvel/rime-ice.git upstream/base
 
       - name: Download tone-marked radical readings
         run: python3 scripts/fetch_radical_readings.py
@@ -178,7 +178,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git -C upstream/rime-ice rev-parse --short HEAD > scripts/.rime_ice_hash
-          git add scripts/.rime_ice_hash scripts/.zhwiki_build_rules
+          git -C upstream/base rev-parse --short HEAD > scripts/.base_source_hash
+          git add scripts/.base_source_hash scripts/.zhwiki_build_rules
           git diff --cached --quiet || git commit -m "chore: 更新上游仓库 hash 记录"
           git push

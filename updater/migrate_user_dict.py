@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert a Rime user dictionary snapshot from rime_ice to fuyao_rime."""
+"""Convert a legacy Rime user dictionary snapshot for Fuyao Rime."""
 
 import argparse
 from pathlib import Path
@@ -23,7 +23,7 @@ def migrate_snapshot(source: Path) -> Path:
         raise ValueError("快照须有唯一的 Rime 用户词库名称和类型")
     (name,) = names
     if not re.fullmatch(rb"rime_ice(?:\.userdb(?:\.kct|\.txt)?)?", name[2]):
-        raise ValueError("此脚本只迁移 rime_ice 个人词库快照")
+        raise ValueError("请选择旧版拼音方案的个人词库快照")
 
     start, end = name.span(2)
     converted = data[:start] + b"fuyao_rime" + data[end:]
@@ -39,8 +39,8 @@ def migrate_snapshot(source: Path) -> Path:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="将 rime_ice 用户词库快照转换为 fuyao_rime")
-    parser.add_argument("snapshot", type=Path, help="由 Rime 同步生成的 rime_ice.userdb.txt")
+    parser = argparse.ArgumentParser(description="将旧版个人词库快照转换为 fuyao_rime")
+    parser.add_argument("snapshot", type=Path, help="由 Rime 同步生成的旧版 .userdb.txt 快照")
     args = parser.parse_args()
     try:
         output = migrate_snapshot(args.snapshot)

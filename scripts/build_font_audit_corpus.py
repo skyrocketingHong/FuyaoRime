@@ -7,6 +7,7 @@ import hashlib
 import json
 import urllib.request
 import yaml
+from stage_base import base_source_dir
 
 BASE = 'https://www.unicode.org/Public/17.0.0/ucd/'
 UCD_SHA256 = {
@@ -17,12 +18,13 @@ UCD_SHA256 = {
     'emoji/emoji-data.txt': '2cb2bb9455cda83e8481541ecf5b6dfda66a3bb89efa3fa7c5297eccf607b72b',
 }
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--repo', type=Path, default=Path(__file__).resolve().parents[1], help='FuyaoRime checkout containing upstream/rime-ice')
+parser.add_argument('--repo', type=Path, default=Path(__file__).resolve().parents[1], help='FuyaoRime checkout containing the base configuration')
 parser.add_argument('--ucd-dir', type=Path, default=Path('dist/font-audit/ucd'))
 parser.add_argument('--output', type=Path, default=Path('dist/font-audit/corpus.json'))
 parser.add_argument('--download', action='store_true', help='Download missing UCD files from fixed Unicode 17 URLs')
 args = parser.parse_args()
 ROOT, UCD, OUTPUT = args.repo.resolve(), args.ucd_dir, args.output
+BASE_CONFIG = base_source_dir(ROOT)
 UCD.mkdir(parents=True, exist_ok=True)
 OUTPUT.parent.mkdir(parents=True, exist_ok=True)
 for name, expected_sha in UCD_SHA256.items():
@@ -133,7 +135,7 @@ for block in COMMON_BLOCKS + ['Basic Latin', 'Latin-1 Supplement', 'Halfwidth an
                            source=f'Unicode 17.0.0: {block}')
         block_counts[block] += 1
 
-input_paths = []
+input_paths = {}
 input_counts = {}
 rejected = Counter()
 candidate_sources = defaultdict(set)
@@ -171,9 +173,9 @@ def candidate(text, source, allow_single_letter=False):
                        category=category, source=source)
 
 for name in ('symbols_v.yaml', 'symbols_caps_v.yaml'):
-    rel = 'upstream/rime-ice/' + name
-    path = ROOT / rel
-    input_paths.append(path)
+    rel = 'upstream/base/' + name
+    path = BASE_CONFIG / name
+    input_paths[rel] = path
     table = yaml.safe_load(path.read_text())['symbols']
     input_counts[rel] = dict(keys=len(table), values=sum(map(len, table.values())))
     for key, values in table.items():
@@ -182,27 +184,27 @@ for name in ('symbols_v.yaml', 'symbols_caps_v.yaml'):
         for value in values:
             candidate(value, rel + ':' + key, allow_single_letter=True)
 
-rel = 'upstream/rime-ice/others/emoji-map.txt'
-path = ROOT / rel
-input_paths.append(path)
+rel = 'upstream/base/others/emoji-map.txt'
+path = BASE_CONFIG / 'others/emoji-map.txt'
+input_paths[rel] = path
 for n, line in enumerate(path.read_text().splitlines(), 1):
     if not line.strip() or line.lstrip().startswith('#'):
         continue
     candidate(line.split()[0], rel + ':' + str(n))
 
 for name in ('opencc/emoji.txt', 'opencc/others.txt'):
-    rel = 'upstream/rime-ice/' + name
-    path = ROOT / rel
-    input_paths.append(path)
+    rel = 'upstream/base/' + name
+    path = BASE_CONFIG / name
+    input_paths[rel] = path
     for n, line in enumerate(path.read_text().splitlines(), 1):
         if '\t' not in line or line.startswith('----------'):
             continue
         for value in line.split('\t', 1)[1].split():
             candidate(value, rel + ':' + str(n))
 
-rel = 'upstream/rime-ice/default.yaml'
-path = ROOT / rel
-input_paths.append(path)
+rel = 'upstream/base/default.yaml'
+path = BASE_CONFIG / 'default.yaml'
+input_paths[rel] = path
 def visit(value, source):
     if isinstance(value, str):
         candidate(value, source)
@@ -230,7 +232,7 @@ metadata = dict(
              'No block sweep for ancient scripts, Alchemical Symbols, Byzantine Musical Symbols, Ancient Greek Musical Notation, Tai Xuan Jing, legacy computing; source candidates may still include them.',
              'CJK-named blocks retain only non-CJK-script punctuation, number symbols, and compatibility units.'],
     ucd_sources={name: dict(url=BASE+name, sha256=sha) for name, sha in UCD_SHA256.items()},
-    input_sha256={str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in input_paths},
+    input_sha256={name: hashlib.sha256(path.read_bytes()).hexdigest() for name, path in input_paths.items()},
     corpus_sha256=hashlib.sha256(OUTPUT.read_bytes()).hexdigest(),
 )
 OUTPUT.with_suffix('.metadata.json').write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + '\n')

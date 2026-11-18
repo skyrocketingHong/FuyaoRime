@@ -34,7 +34,8 @@ class ReleaseNotesTests(unittest.TestCase):
             (output / 'added.lua').write_text('added')
             previous = root / 'previous.zip'
             with zipfile.ZipFile(previous, 'w') as archive:
-                for name, text in [('same.yaml', 'same'), ('changed.yaml', 'old'), ('deleted.yaml', 'old')]:
+                for name, text in [('same.yaml', 'same'), ('changed.yaml', 'old'), ('deleted.yaml', 'old'),
+                                   ('rime_ice.dict.yaml', 'old base dictionary')]:
                     archive.writestr(name, text)
             diff = root / 'diff.zip'
             report = root / 'summary.json'
@@ -44,17 +45,20 @@ class ReleaseNotesTests(unittest.TestCase):
             summary = json.loads(report.read_text())
             self.assertEqual(summary['added'], ['added.lua'])
             self.assertEqual(summary['modified'], ['changed.yaml'])
-            self.assertEqual(summary['deleted'], ['deleted.yaml'])
+            self.assertEqual(summary['deleted'], ['deleted.yaml', 'rime_ice.dict.yaml'])
             with zipfile.ZipFile(diff) as archive:
                 self.assertEqual(set(archive.namelist()), {'INCREMENTAL-README.txt', 'added.lua', 'changed.yaml'})
                 text = archive.read('INCREMENTAL-README.txt').decode()
                 self.assertIn('适用版本: 20261010 -> 20261010-v2', text)
                 self.assertIn('新增文件（1 个）:', text)
                 self.assertIn('修改文件（1 个）:', text)
-                self.assertIn('以下 1 个文件已从配置包移除', text)
+                self.assertIn('以下 2 个文件已从配置包移除', text)
+                self.assertIn('  - rime_ice.dict.yaml', text)
             notes = NOTES.render(output, '20261010-v2', summary, '全拼增加拆字候选和带调注音。')
-            self.assertIn('新增 1 个、修改 1 个、删除 1 个', notes)
+            self.assertIn('新增 1 个、修改 1 个、删除 2 个', notes)
             self.assertIn('fuyaorime-20261010-v2-diff-from-20261010.zip', notes)
+            self.assertIn('迁入 Fuyao Rime', notes)
+            self.assertNotIn('rime_ice', notes)
             for name in ('added.lua', 'changed.yaml', 'deleted.yaml'):
                 self.assertIn(f'`{name}`', notes)
             self.assertNotIn('—', notes)

@@ -119,9 +119,9 @@ class IosShortcutTests(unittest.TestCase):
         guard = by_id[BUILDER.identifier("writable-item")]["WFWorkflowActionParameters"]
         self.assertEqual(guard["WFCondition"], 101)
         self.assertEqual(guard["WFInput"]["Variable"]["Value"]["OutputUUID"], BUILDER.identifier("protected-item"))
-        for name in ("installation.yaml", "INSTALLATION.YAML", "rime_ice.userdb", "userdb"):
+        for name in ("installation.yaml", "INSTALLATION.YAML", "fuyao_rime.userdb", "userdb"):
             self.assertIsNotNone(re.fullmatch(pattern, name, re.I), name)
-        for name in ("rime_ice.schema.yaml", "cn_dicts", "lua"):
+        for name in ("fuyao_rime.schema.yaml", "cn_dicts", "lua"):
             self.assertIsNone(re.fullmatch(pattern, name, re.I), name)
         actions = self.workflow["WFWorkflowActions"]
         indexes = {a["WFWorkflowActionParameters"]["UUID"]: i for i, a in enumerate(actions)}

@@ -1,14 +1,13 @@
 #!/bin/bash
-# merge.sh - 合并雾凇拼音和自定义配置
+# merge.sh - 构建 Fuyao Rime 配置包
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
-UPSTREAM_DIR="$PROJECT_DIR/upstream/rime-ice"
 OVERLAY_DIR="$PROJECT_DIR/overlay"
-OUTPUT_DIR="$PROJECT_DIR/output"
+PACKAGE_DIR="$PROJECT_DIR/output"
 READINGS_FILE="$PROJECT_DIR/upstream/radical-readings/zdict.reverse.bin"
 
 # 注音是全拼拆字功能的必要资源，缺失时不能发布不完整的配置包。
@@ -17,84 +16,14 @@ if [ ! -s "$READINGS_FILE" ]; then
     exit 1
 fi
 
-# 上游方案含带制表符的标量，按行修改方案声明、引用及九键词库名，保留其余 YAML 原文。
-# 若上游结构变化，在清理上一次输出前停止。
-SCHEMA_DIR="$(mktemp -d)"
-trap 'rm -rf "$SCHEMA_DIR"' EXIT
-python3 - "$UPSTREAM_DIR" "$SCHEMA_DIR" <<'PYTHON'
-from pathlib import Path
-import re
-import sys
-
-upstream, staging = map(Path, sys.argv[1:])
-changes = {
-    "rime_ice.schema.yaml": ("fuyao_rime.schema.yaml", {
-        r"^  schema_id: rime_ice$": "  schema_id: fuyao_rime",
-        r"^  name: 雾凇拼音$": "  name: Fuyao Rime",
-    }),
-    "t9.schema.yaml": ("t9.schema.yaml", {
-        r"^__include: rime_ice\.schema\.yaml:/": "__include: fuyao_rime.schema.yaml:/",
-        r"^(  prism: t9)$": r"\1\n  user_dict: rime_ice",
-    }),
-    "default.yaml": ("default.yaml", {
-        r"^  - schema: rime_ice[ \t]*(?:#.*)?$": "  - schema: fuyao_rime             # Fuyao Rime（全拼）",
-    }),
-    "recipe.yaml": ("recipe.yaml", {
-        r"^  rime_ice\.schema\.yaml$": "  fuyao_rime.schema.yaml",
-    }),
-}
-for filename, (destination, replacements) in changes.items():
-    source = upstream / filename
-    if filename == "recipe.yaml" and not source.exists():
-        continue
-    content = source.read_text(encoding="utf-8")
-    for pattern, replacement in replacements.items():
-        content, matches = re.subn(pattern, replacement, content, flags=re.MULTILINE)
-        if matches != 1:
-            raise SystemExit(f"{filename} 中应有一处方案声明或引用可替换：{pattern}")
-    if filename == "default.yaml":
-        content = content.replace("它依赖于 rime_ice，用九宫格别删 rime_ice.schema.yaml",
-                                  "它依赖于 fuyao_rime，用九宫格别删 fuyao_rime.schema.yaml")
-    (staging / destination).write_text(content, encoding="utf-8")
-PYTHON
+# 在项目卷上准备完整配置包，成功后再替换上一次输出。
+OUTPUT_DIR="$(mktemp -d "$PROJECT_DIR/.fuyaorime-build.XXXXXXXX")"
+trap 'rm -rf "$OUTPUT_DIR"' EXIT
 
 echo "=== 开始合并 Rime 配置 ==="
 
-# 清理输出目录
-rm -rf "$OUTPUT_DIR"
-mkdir -p "$OUTPUT_DIR"
-
-# 1. 复制雾凇拼音核心文件
-echo "[1/5] 复制雾凇拼音核心文件..."
-# 复制全部输入方案（全拼、七种双拼、英文、部首拆字、九键 T9）
-for schema in "$UPSTREAM_DIR"/*.schema.yaml; do
-    case "${schema##*/}" in
-        rime_ice.schema.yaml|t9.schema.yaml) continue ;;
-    esac
-    cp "$schema" "$OUTPUT_DIR/"
-done
-cp "$SCHEMA_DIR"/*.yaml "$OUTPUT_DIR/"
-# 复制其他配置文件
-cp "$UPSTREAM_DIR/rime_ice.dict.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
-cp "$UPSTREAM_DIR/melt_eng.dict.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
-cp "$UPSTREAM_DIR/radical_pinyin.dict.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
-cp "$UPSTREAM_DIR/symbols_v.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
-cp "$UPSTREAM_DIR/symbols_caps_v.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
-cp "$UPSTREAM_DIR/user.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
-cp "$UPSTREAM_DIR"/*.txt "$OUTPUT_DIR/" 2>/dev/null || true
-cp "$UPSTREAM_DIR/LICENSE" "$OUTPUT_DIR/"
-
-# 复制子目录
-cp -r "$UPSTREAM_DIR/cn_dicts" "$OUTPUT_DIR/"
-# 复制全部英文词典，含各双拼方案专用的 en_dicts/cn_en_*.txt
-cp -r "$UPSTREAM_DIR/en_dicts" "$OUTPUT_DIR/"
-cp -r "$UPSTREAM_DIR/opencc" "$OUTPUT_DIR/"
-cp -r "$UPSTREAM_DIR/lua" "$OUTPUT_DIR/"
-
-# 只复制 others 中的必要文件，跳过文档和资源
-mkdir -p "$OUTPUT_DIR/others"
-cp "$UPSTREAM_DIR/others/cn_en.txt" "$OUTPUT_DIR/others/" 2>/dev/null || true
-cp "$UPSTREAM_DIR/others/emoji-map.txt" "$OUTPUT_DIR/others/" 2>/dev/null || true
+echo "[1/5] 生成基础方案和词库..."
+python3 "$SCRIPT_DIR/stage_base.py" "$PROJECT_DIR" "$OUTPUT_DIR"
 
 # 2. 复制万象拼音语言模型和脚本
 echo "[2/5] 复制万象拼音语言模型和脚本..."
@@ -147,9 +76,12 @@ rm -rf "$OUTPUT_DIR/others/script"
 mkdir -p "$OUTPUT_DIR/build"
 cp "$READINGS_FILE" "$OUTPUT_DIR/build/zdict.reverse.bin"
 
+rm -rf "$PACKAGE_DIR"
+mv "$OUTPUT_DIR" "$PACKAGE_DIR"
+
 echo ""
 echo "=== 合并完成 ==="
-echo "输出目录: $OUTPUT_DIR"
+echo "输出目录: $PACKAGE_DIR"
 echo ""
 echo "文件列表:"
-ls -la "$OUTPUT_DIR"
+ls -la "$PACKAGE_DIR"

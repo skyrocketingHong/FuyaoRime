@@ -236,8 +236,8 @@ install_to_device() {
     # 删除清单是建议性清理，远端无法区分目录条目，失败不应中断安装（与桌面脚本跳过目录一致）。
     [ -z "$del_args" ] || remote_cmd+=" && { rm -f --$del_args 2>/dev/null || true; }"
     # librime 的 detect_modifications 只比较用户目录顶层 YAML 的修改时间，
-    # 触碰配置包自有的顶层词库引用文件，确保输入法重启后一定重新部署。
-    remote_cmd+=" && touch -c $(shq "$RIME_DIR/rime_ice.custom.dict.yaml")"
+    # 更新始终存在的顶层方案列表时间，覆盖只修改子目录词库的增量包。
+    remote_cmd+=" && touch -c $(shq "$RIME_DIR/default.custom.yaml")"
     remote_cmd+=" && echo $(shq "$latest") > $(shq "$MARKER")"
     log "正在通过 rish 写入配置目录"
     "$RISH" -c "$remote_cmd" \

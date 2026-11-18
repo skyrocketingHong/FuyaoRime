@@ -5,7 +5,7 @@
 ## 首次设置
 
 1. 将 `.shortcut` 文件通过 AirDrop 或“文件”App 传到 iPhone，打开并添加到“快捷指令”。更新旧版时选择替换。
-2. 选择元书当前使用的**本地方案文件夹**，例如“我的 iPhone → 元书（Hamster3）→ RimeUserData → rime-ice”。不要选 `RimeUserData` 根目录、键盘目录或 iCloud 目录。
+2. 选择元书当前使用的**本地方案文件夹**，例如“我的 iPhone → 元书（Hamster3）→ RimeUserData → fuyao_rime”。不要选 `RimeUserData` 根目录、键盘目录或 iCloud 目录。
 3. 下载代理留空即可直连。需要转发服务时填写完整 HTTP(S) 前缀；它只影响配置包下载，版本查询仍直连 GitHub。
 
 没有出现设置提示时，在快捷指令编辑器开头修改“文件”和“下载代理前缀”动作。首次安装可在 `RimeUserData` 下新建方案文件夹；更新完成后，在元书“输入方案 → 方案目录切换”中选中它。
@@ -16,7 +16,7 @@
 
 完成后会打开元书并请求部署。若未自动执行，在元书中手动选择“RIME → 重新部署”。
 
-从雾凇拼音全拼升级后，在元书输入方案中选择“Fuyao Rime”。词库备份和自定义补丁迁移见[全拼升级说明](../README.md#从雾凇拼音全拼升级)。
+升级后在元书输入方案中选择“Fuyao Rime”。恢复旧词频和个人补丁时，见[升级与个人词库迁移](../README.md#升级与个人词库迁移)。
 
 更新保留原有目录及根目录的 `installation.yaml`、`userdb` 和所有 `*.userdb`；其他同名配置会被覆盖，请先备份自定义内容。启用 iCloud 自动复制时，云端旧配置可能覆盖本地更新，见[文件管理说明](https://ihsiao.com/apps/hamster/v3/docs/guides/file-manager/)。
 

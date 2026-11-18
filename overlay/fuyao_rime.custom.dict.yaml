@@ -2,7 +2,7 @@
 # encoding: utf-8
 
 ---
-name: rime_ice
+name: fuyao_rime
 version: "2025-09-25"
 import_tables:
   - cn_dicts/8105     # 字表
@@ -51,7 +51,7 @@ import_tables:
 # 大写字母
 # 可在拼音方案下直接输入大写字母（Shift + 字母），大写字母参与造句。
 # 示例：输入 `zuogeDNAjiance` 得到 `做个DNA检测`
-# （非雾凇方案的双拼如果要启用，需要参考双拼方案下的 speller/algebra 将大写字母搭桥改成一些特殊字符）
+# （双拼如需启用，按对应方案的 speller/algebra 调整大写字母的派生规则）
 A	A
 B	B
 C	C

@@ -1,0 +1,7 @@
+Fuyao Rime
+
+基础方案和词表由 Dvel 及其贡献者维护。
+https://github.com/iDvel/rime-ice
+
+Fuyao Rime 在基础方案上定制了方案声明、词库引用和配置。许可证见 LICENSE，其他资源来源见项目说明。
+https://github.com/skyrocketingHong/FuyaoRime#来源与许可

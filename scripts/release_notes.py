@@ -11,14 +11,14 @@ import sys
 from urllib.parse import quote
 
 REPOSITORY = 'https://github.com/skyrocketingHong/FuyaoRime'
-ICE = 'https://github.com/iDvel/rime-ice/blob/main/'
+BASE_SOURCE = 'https://github.com/iDvel/rime-ice/blob/main/'
 RADICAL = 'https://github.com/mirtlecn/rime-radical-pinyin'
-ICE_LABELS = {
+BASE_LABELS = {
     'cn_dicts/41448.dict.yaml': '扩展字表（41448）',
     'cn_dicts/8105.dict.yaml': '通用规范汉字表（8105）',
-    'cn_dicts/base.dict.yaml': '雾凇基础词库',
-    'cn_dicts/ext.dict.yaml': '雾凇扩展词库',
-    'cn_dicts/others.dict.yaml': '雾凇补充词库',
+    'cn_dicts/base.dict.yaml': '基础词库',
+    'cn_dicts/ext.dict.yaml': '扩展词库',
+    'cn_dicts/others.dict.yaml': '补充词库',
     'cn_dicts/tencent.dict.yaml': '腾讯词库',
     'en_dicts/en.dict.yaml': '英文基础词库',
     'en_dicts/en_ext.dict.yaml': '英文扩展词库',
@@ -85,10 +85,10 @@ def source_rows(output):
     for folder in ('cn_dicts', 'en_dicts'):
         for path in sorted((output / folder).glob('*.dict.yaml')):
             relative = path.relative_to(output).as_posix()
-            rows.append((ICE_LABELS.get(relative, relative), ICE + relative, dictionary_version(path)))
+            rows.append((BASE_LABELS.get(relative, relative), BASE_SOURCE + relative, dictionary_version(path)))
     for path in sorted((output / 'en_dicts').glob('cn_en*.txt')):
         relative = path.relative_to(output).as_posix()
-        rows.append((ICE_LABELS.get(relative, relative), ICE + relative, '随雾凇同步'))
+        rows.append((BASE_LABELS.get(relative, relative), BASE_SOURCE + relative, '随基础配置同步'))
     for path in sorted((output / 'custom_dicts').glob('*.dict.yaml')):
         key = path.name.removesuffix('.dict.yaml')
         if key not in EXTRA_SOURCES:
@@ -119,6 +119,9 @@ def render(output, version, summary=None, highlight=''):
         previous = summary['from']
         lines.append(f'- [增量包]({base}fuyaorime-{version}-diff-from-{previous}.zip)：仅用于 `{previous}`，其他版本使用全量包。')
     lines += ['', '解压覆盖到当前 Rime 配置目录后重新部署。']
+    legacy_paths = {path for path in summary['deleted'] if path.startswith('rime_ice.')} if summary else set()
+    if legacy_paths:
+        lines += ['', f'旧版词条和词频可通过快照迁入 Fuyao Rime。[迁移说明]({REPOSITORY}#升级与个人词库迁移)']
     if '-v' in version:
         lines += ['', f'使用自动更新时，请先更新[桌面脚本]({REPOSITORY}#自动更新)或 [iOS 快捷指令]({REPOSITORY}/blob/main/updater/IOS.md)，旧版不识别修订号。']
     rows = source_rows(output)
@@ -132,7 +135,10 @@ def render(output, version, summary=None, highlight=''):
                   '', '<details>', '<summary>查看文件清单</summary>', '']
         for key, label in [('added', '新增'), ('modified', '修改'), ('deleted', '删除')]:
             lines += [f'### {label}', '']
-            lines += [f'- `{path}`' for path in summary[key]] or ['无。']
+            entries = [f'- `{path}`' for path in summary[key] if key != 'deleted' or path not in legacy_paths]
+            if key == 'deleted' and legacy_paths:
+                entries += [f'- 旧版方案和词库文件（{len(legacy_paths)} 个）']
+            lines += entries or ['无。']
             lines += ['']
         lines += ['</details>']
     return '\n'.join(lines) + '\n'

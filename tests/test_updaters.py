@@ -188,8 +188,8 @@ class UpdaterCases:
         (self.rime / "personal.userdb").write_text("user data")
         self.protected = {
             "installation.yaml": "local installation",
-            "rime_ice.userdb/CURRENT": "local database head",
-            "rime_ice.userdb/000001.ldb": "local learned words",
+            "fuyao_rime.userdb/CURRENT": "local database head",
+            "fuyao_rime.userdb/000001.ldb": "local learned words",
             "double_pinyin.userdb/CURRENT": "other schema database",
             "userdb/records": "local database container",
             "nested/installation.yaml": "nested installation",
@@ -270,7 +270,7 @@ class UpdaterCases:
 
     def test_diff_cannot_overwrite_or_delete_user_data(self):
         readme = "适用版本: 20261003 -> 20261004\n\n已从配置包移除\n"
-        readme += "".join(f"  - {name}\n" for name in [*self.protected, "rime_ice.userdb", "obsolete.yaml"])
+        readme += "".join(f"  - {name}\n" for name in [*self.protected, "fuyao_rime.userdb", "obsolete.yaml"])
         files = {name: "incoming user data" for name in self.protected}
         files.update({"config.yaml": "diff", "INCREMENTAL-README.txt": readme})
         self.archive(f"fuyaorime-{LATEST}-diff-from-20261003.zip", files)
@@ -578,6 +578,20 @@ class AndroidUpdaterTests(UpdaterCases, unittest.TestCase):
         self.run_update()
         self.assertEqual((self.fixture / "am-calls").read_text().splitlines(),
                          ["am force-stop org.fcitx.fcitx5.android"])
+
+    def test_dictionary_only_update_touches_top_level_config(self):
+        default = self.rime / "default.custom.yaml"
+        default.write_text("configuration")
+        previous_mtime = 1_600_000_000
+        os.utime(default, (previous_mtime, previous_mtime))
+        self.archive(f"fuyaorime-{LATEST}-diff-from-20261003.zip", {
+            "INCREMENTAL-README.txt": f"适用版本: 20261003 -> {LATEST}\n",
+            "custom_dicts/test.dict.yaml": "updated words",
+        })
+        self.run_update()
+        self.assertGreater(default.stat().st_mtime, previous_mtime)
+        self.assertEqual(default.read_text(), "configuration")
+        self.assertEqual((self.rime / "custom_dicts/test.dict.yaml").read_text(), "updated words")
 
     def test_staging_directory_is_cleaned_after_run(self):
         self.run_update()
