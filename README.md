@@ -41,6 +41,12 @@ FuyaoRime 将[雾凇拼音](https://github.com/iDvel/rime-ice)、[万象语言�
 
 手动覆盖配置后删除 `fuyaorime-version.txt`，让更新脚本下次使用全量包重建版本基线。
 
+### 从雾凇拼音全拼升级
+
+升级前可在 Rime 客户端同步用户资料，备份同步目录中的 `rime_ice.userdb.txt`。覆盖配置并重新部署后，切换到“Fuyao Rime”，即可继续使用原来的 `rime_ice.userdb`。在新设备恢复时，先启用“Fuyao Rime”，再通过客户端导入快照或从同步目录恢复，保留备份文件原名。
+
+全拼方案 ID 已改为 `fuyao_rime`。如果改过方案列表，请将其中的 `rime_ice` 改为 `fuyao_rime`。原 `rime_ice.custom.yaml` 中自行添加的设置可合并到 `fuyao_rime.custom.yaml`。
+
 ## 自动更新
 
 脚本优先使用与本地版本匹配的增量包；无有效标记、跨版或增量包不可用时下载全量包。已是最新版本时跳过，本地版本较新时不降级。
@@ -171,7 +177,7 @@ schtasks /Create /SC DAILY /ST 09:00 /TN "FuyaoRime Update" ^
 
 | 方案 | `schema_id` |
 | --- | --- |
-| 雾凇拼音全拼 | `rime_ice` |
+| Fuyao Rime（全拼） | `fuyao_rime` |
 | 自然码双拼 | `double_pinyin` |
 | 智能 ABC 双拼 | `double_pinyin_abc` |
 | 微软双拼 | `double_pinyin_mspy` |
@@ -192,7 +198,7 @@ schtasks /Create /SC DAILY /ST 09:00 /TN "FuyaoRime Update" ^
 | 配置项 | 源文件 |
 | --- | --- |
 | 启用方案、标点 | [default.custom.yaml](overlay/default.custom.yaml) |
-| 全拼模型、模糊音、拆字设置 | [rime_ice.custom.yaml](overlay/rime_ice.custom.yaml) |
+| 全拼模型、模糊音、拆字设置 | [fuyao_rime.custom.yaml](overlay/fuyao_rime.custom.yaml) |
 | 额外词库引用 | [rime_ice.custom.dict.yaml](overlay/rime_ice.custom.dict.yaml) |
 | 英文派生 | [melt_eng.custom.yaml](overlay/melt_eng.custom.yaml) |
 | 拆字混输实现 | [fuyao_radical.lua](overlay/lua/fuyao_radical.lua) |

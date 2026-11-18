@@ -29,15 +29,15 @@ class RadicalEngineTests(unittest.TestCase):
             raise unittest.SkipTest("Fetch upstream/rime-ice before running engine tests")
         cls.temp = tempfile.TemporaryDirectory(prefix="fuyaorime-engine-")
         cls.addClassCleanup(cls.temp.cleanup)
-        shared = Path(cls.temp.name) / "shared"
-        cls.user = Path(cls.temp.name) / "user"
-        shared.mkdir()
+        fixture = Path(cls.temp.name)
+        (fixture / "upstream").symlink_to(ROOT / "upstream", target_is_directory=True)
+        (fixture / "overlay").symlink_to(ROOT / "overlay", target_is_directory=True)
+        (fixture / "scripts").mkdir()
+        shutil.copy2(ROOT / "scripts/merge.sh", fixture / "scripts")
+        subprocess.run(["bash", str(fixture / "scripts/merge.sh")], check=True, capture_output=True)
+        shared = fixture / "output"
+        cls.user = fixture / "user"
         cls.user.mkdir()
-        for path in upstream.glob("*.yaml"):
-            shutil.copy2(path, shared / path.name)
-        for name in ("lua", "opencc"):
-            shutil.copytree(upstream / name, shared / name)
-        (shared / "en_dicts").mkdir()
         (shared / "en_dicts/cn_en.txt").write_text("")
         # Small deterministic ordinary vocabulary; the real radical table is unchanged.
         (shared / "melt_eng.dict.yaml").write_text(
@@ -51,28 +51,28 @@ class RadicalEngineTests(unittest.TestCase):
             "火\thuo\t100\n火火火\thuo huo huo\t1000\n水\tshui\t100\n"
             "水水水\tshui shui shui\t1000\n金\tjin\t100\n金金金\tjin jin jin\t1000\n")
         (cls.user / "build").mkdir()
-        shutil.copy2(ROOT / "upstream/radical-readings/zdict.reverse.bin", cls.user / "build")
+        shutil.copy2(shared / "build/zdict.reverse.bin", cls.user / "build")
         (cls.user / "lua").mkdir()
-        shutil.copy2(ROOT / "overlay/lua/fuyao_radical.lua", cls.user / "lua")
-        shutil.copy2(ROOT / "overlay/melt_eng.custom.yaml", cls.user)
-        defaults = yaml.safe_load((ROOT / "overlay/default.custom.yaml").read_text())
-        defaults["patch"]["schema_list"] = [{"schema": "rime_ice"}, {"schema": "fuyao_baseline"}]
+        shutil.copy2(shared / "lua/fuyao_radical.lua", cls.user / "lua")
+        shutil.copy2(shared / "melt_eng.custom.yaml", cls.user)
+        defaults = yaml.safe_load((shared / "default.custom.yaml").read_text())
+        defaults["patch"]["schema_list"] = [{"schema": schema}
+                                            for schema in ("fuyao_rime", "fuyao_baseline", "t9")]
         (cls.user / "default.custom.yaml").write_text(yaml.safe_dump(defaults, allow_unicode=True))
-        patch = yaml.safe_load((ROOT / "overlay/rime_ice.custom.yaml").read_text())
+        patch = yaml.safe_load((shared / "fuyao_rime.custom.yaml").read_text())
         # The grammar and large extra word lists are outside this feature's scope.
         patch["patch"] = {key: value for key, value in patch["patch"].items() if not key.startswith("grammar/")}
-        (cls.user / "rime_ice.custom.yaml").write_text(yaml.safe_dump(patch, allow_unicode=True))
+        (cls.user / "fuyao_rime.custom.yaml").write_text(yaml.safe_dump(patch, allow_unicode=True))
         # Keep upstream syntax intact: yaml-cpp accepts tabs in its pin-candidate scalars.
-        baseline = (shared / "rime_ice.schema.yaml").read_text()
-        assert baseline.count("schema_id: rime_ice") == 1
+        baseline = (shared / "fuyao_rime.schema.yaml").read_text()
         (shared / "fuyao_baseline.schema.yaml").write_text(
-            baseline.replace("schema_id: rime_ice", "schema_id: fuyao_baseline", 1))
+            baseline.replace("schema_id: fuyao_rime", "schema_id: fuyao_baseline", 1))
         del patch["patch"]["engine/filters/+"]
         del patch["patch"]["fuyao_radical"]
         (cls.user / "fuyao_baseline.custom.yaml").write_text(yaml.safe_dump(patch, allow_unicode=True))
         cls.command = RUNTIME + [str(shared), str(cls.user)]
         cls.baseline = cls.query("fuyao_baseline", INPUTS)
-        cls.results = cls.query("rime_ice", INPUTS)
+        cls.results = cls.query("fuyao_rime", INPUTS)
 
     @classmethod
     def query(cls, schema, inputs):
@@ -84,6 +84,17 @@ class RadicalEngineTests(unittest.TestCase):
     def candidates(self, input_text, baseline=False):
         rows = self.baseline if baseline else self.results
         return next(row["candidates"] for row in rows if row.get("input") == input_text)
+
+    def test_renamed_schema_and_t9_deploy_with_the_original_user_dict(self):
+        import yaml
+
+        main = yaml.safe_load((self.user / "build/fuyao_rime.schema.yaml").read_text())
+        t9 = yaml.safe_load((self.user / "build/t9.schema.yaml").read_text())
+        self.assertEqual(main["schema"]["name"], "Fuyao Rime")
+        self.assertEqual(main["translator"]["user_dict"], "rime_ice")
+        self.assertEqual(t9["schema"]["schema_id"], "t9")
+        self.assertEqual(t9["translator"]["prism"], "t9")
+        self.assertTrue((self.user / "rime_ice.userdb").exists())
 
     def test_mamama_keeps_top_three_and_inserts_tone_marked_radicals(self):
         before = self.candidates("mamama", baseline=True)
@@ -118,7 +129,7 @@ class RadicalEngineTests(unittest.TestCase):
         self.assertEqual(sum(item["text"] == "林" for item in candidates), 1)
 
     def test_selecting_radical_does_not_learn_a_main_pinyin_spelling(self):
-        rows = self.query("rime_ice", ["mamama", "select:3", "mamama"])
+        rows = self.query("fuyao_rime", ["mamama", "select:3", "mamama"])
         self.assertIn(rows[1]["commit"], ("骉", "驫"))
         self.assertEqual(rows[0]["candidates"], rows[2]["candidates"])
         self.assertFalse(list(self.user.glob("radical_pinyin.userdb*")))

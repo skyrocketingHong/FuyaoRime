@@ -16,6 +16,8 @@
 
 完成后会打开元书并请求部署。若未自动执行，在元书中手动选择“RIME → 重新部署”。
 
+从雾凇拼音全拼升级后，在元书输入方案中选择“Fuyao Rime”。词库备份和自定义补丁迁移见[全拼升级说明](../README.md#从雾凇拼音全拼升级)。
+
 更新保留原有目录及根目录的 `installation.yaml`、`userdb` 和所有 `*.userdb`；其他同名配置会被覆盖，请先备份自定义内容。启用 iCloud 自动复制时，云端旧配置可能覆盖本地更新，见[文件管理说明](https://ihsiao.com/apps/hamster/v3/docs/guides/file-manager/)。
 
 ## 自动化与字体

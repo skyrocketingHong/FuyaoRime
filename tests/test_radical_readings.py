@@ -62,12 +62,18 @@ class ReadingResourceTests(unittest.TestCase):
                 (upstream / name).mkdir()
             (upstream / "LICENSE").write_text("fixture license\n")
             schemas = ["double_pinyin" + suffix for suffix in ("", "_abc", "_flypy", "_mspy", "_sogou", "_ziguang", "_jiajia")]
-            for name in schemas + ["rime_ice", "radical_pinyin"]:
+            for name in schemas + ["radical_pinyin"]:
                 (upstream / f"{name}.schema.yaml").write_text(f"schema:\n  schema_id: {name}\n")
+            pinyin = "schema:\n  schema_id: rime_ice\n  name: 雾凇拼音\npin_cand_filter:\n  - d\t的\n"
+            t9 = "__include: rime_ice.schema.yaml:/\nschema:\n  schema_id: t9\n"
+            (upstream / "rime_ice.schema.yaml").write_text(pinyin)
+            (upstream / "t9.schema.yaml").write_text(t9)
+            (upstream / "default.yaml").write_text("schema_list:\n  - schema: rime_ice\n  - schema: t9\n")
+            (upstream / "recipe.yaml").write_text("install_files: >-\n  rime_ice.schema.yaml\n  rime_ice.dict.yaml\n")
             readings = root / "upstream/radical-readings/zdict.reverse.bin"
             readings.write_bytes(DATA)
-            patch = ROOT / "overlay/rime_ice.custom.yaml"
-            (root / "overlay/rime_ice.custom.yaml").write_bytes(patch.read_bytes())
+            patch = ROOT / "overlay/fuyao_rime.custom.yaml"
+            (root / "overlay" / patch.name).write_bytes(patch.read_bytes())
             lua = ROOT / "overlay/lua/fuyao_radical.lua"
             (root / "overlay/lua/fuyao_radical.lua").write_bytes(lua.read_bytes())
             subprocess.run(["bash", str(root / "scripts/merge.sh")], check=True, capture_output=True)
@@ -75,12 +81,27 @@ class ReadingResourceTests(unittest.TestCase):
             self.assertEqual((output / "build/zdict.reverse.bin").read_bytes(), DATA)
             self.assertEqual((output / "lua/fuyao_radical.lua").read_bytes(), lua.read_bytes())
             self.assertEqual((output / patch.name).read_bytes(), patch.read_bytes())
+            self.assertFalse((output / "rime_ice.schema.yaml").exists())
+            self.assertEqual((output / "fuyao_rime.schema.yaml").read_text(),
+                             pinyin.replace("schema_id: rime_ice", "schema_id: fuyao_rime")
+                             .replace("name: 雾凇拼音", "name: Fuyao Rime"))
+            self.assertEqual((output / "t9.schema.yaml").read_text(),
+                             t9.replace("rime_ice.schema.yaml", "fuyao_rime.schema.yaml"))
+            self.assertIn("- schema: fuyao_rime", (output / "default.yaml").read_text())
+            self.assertIn("  fuyao_rime.schema.yaml\n  rime_ice.dict.yaml", (output / "recipe.yaml").read_text())
+            self.assertIn(b'"translator/user_dict": rime_ice', (output / patch.name).read_bytes())
             for name in schemas:
                 filename = f"{name}.schema.yaml"
                 self.assertEqual((output / filename).read_bytes(), (upstream / filename).read_bytes())
                 self.assertFalse((output / f"{name}.custom.yaml").exists())
             # Missing resources must stop before removing the last usable output.
             readings.unlink()
+            result = subprocess.run(["bash", str(root / "scripts/merge.sh")], capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual((output / "build/zdict.reverse.bin").read_bytes(), DATA)
+            # A changed upstream reference must also leave the previous output intact.
+            readings.write_bytes(DATA)
+            (upstream / "t9.schema.yaml").write_text(t9.replace("rime_ice.schema.yaml", "other.yaml"))
             result = subprocess.run(["bash", str(root / "scripts/merge.sh")], capture_output=True)
             self.assertNotEqual(result.returncode, 0)
             self.assertEqual((output / "build/zdict.reverse.bin").read_bytes(), DATA)

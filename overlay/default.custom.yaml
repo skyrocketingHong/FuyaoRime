@@ -1,6 +1,6 @@
 patch:
   schema_list:
-    - schema: rime_ice               # 雾凇拼音（全拼）
+    - schema: fuyao_rime             # Fuyao Rime（全拼）
     # - schema: t9                   # 中文九键（仓输入法 & 元书输入法，移动端按需启用）
     - schema: double_pinyin          # 自然码双拼
     - schema: double_pinyin_abc      # 智能 ABC 双拼

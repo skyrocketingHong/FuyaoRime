@@ -17,6 +17,46 @@ if [ ! -s "$READINGS_FILE" ]; then
     exit 1
 fi
 
+# 上游方案含带制表符的标量，仅替换方案声明和引用，保留其余 YAML 原文。
+# 若上游结构变化，在清理上一次输出前停止。
+SCHEMA_DIR="$(mktemp -d)"
+trap 'rm -rf "$SCHEMA_DIR"' EXIT
+python3 - "$UPSTREAM_DIR" "$SCHEMA_DIR" <<'PYTHON'
+from pathlib import Path
+import re
+import sys
+
+upstream, staging = map(Path, sys.argv[1:])
+changes = {
+    "rime_ice.schema.yaml": ("fuyao_rime.schema.yaml", {
+        r"^  schema_id: rime_ice$": "  schema_id: fuyao_rime",
+        r"^  name: 雾凇拼音$": "  name: Fuyao Rime",
+    }),
+    "t9.schema.yaml": ("t9.schema.yaml", {
+        r"^__include: rime_ice\.schema\.yaml:/": "__include: fuyao_rime.schema.yaml:/",
+    }),
+    "default.yaml": ("default.yaml", {
+        r"^  - schema: rime_ice[ \t]*(?:#.*)?$": "  - schema: fuyao_rime             # Fuyao Rime（全拼）",
+    }),
+    "recipe.yaml": ("recipe.yaml", {
+        r"^  rime_ice\.schema\.yaml$": "  fuyao_rime.schema.yaml",
+    }),
+}
+for filename, (destination, replacements) in changes.items():
+    source = upstream / filename
+    if filename == "recipe.yaml" and not source.exists():
+        continue
+    content = source.read_text(encoding="utf-8")
+    for pattern, replacement in replacements.items():
+        content, matches = re.subn(pattern, replacement, content, flags=re.MULTILINE)
+        if matches != 1:
+            raise SystemExit(f"{filename} 中应有一处方案声明或引用可替换：{pattern}")
+    if filename == "default.yaml":
+        content = content.replace("它依赖于 rime_ice，用九宫格别删 rime_ice.schema.yaml",
+                                  "它依赖于 fuyao_rime，用九宫格别删 fuyao_rime.schema.yaml")
+    (staging / destination).write_text(content, encoding="utf-8")
+PYTHON
+
 echo "=== 开始合并 Rime 配置 ==="
 
 # 清理输出目录
@@ -26,16 +66,20 @@ mkdir -p "$OUTPUT_DIR"
 # 1. 复制雾凇拼音核心文件
 echo "[1/5] 复制雾凇拼音核心文件..."
 # 复制全部输入方案（全拼、七种双拼、英文、部首拆字、九键 T9）
-cp "$UPSTREAM_DIR"/*.schema.yaml "$OUTPUT_DIR/"
+for schema in "$UPSTREAM_DIR"/*.schema.yaml; do
+    case "${schema##*/}" in
+        rime_ice.schema.yaml|t9.schema.yaml) continue ;;
+    esac
+    cp "$schema" "$OUTPUT_DIR/"
+done
+cp "$SCHEMA_DIR"/*.yaml "$OUTPUT_DIR/"
 # 复制其他配置文件
-cp "$UPSTREAM_DIR/default.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
 cp "$UPSTREAM_DIR/rime_ice.dict.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
 cp "$UPSTREAM_DIR/melt_eng.dict.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
 cp "$UPSTREAM_DIR/radical_pinyin.dict.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
 cp "$UPSTREAM_DIR/symbols_v.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
 cp "$UPSTREAM_DIR/symbols_caps_v.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
 cp "$UPSTREAM_DIR/user.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
-cp "$UPSTREAM_DIR/recipe.yaml" "$OUTPUT_DIR/" 2>/dev/null || true
 cp "$UPSTREAM_DIR"/*.txt "$OUTPUT_DIR/" 2>/dev/null || true
 cp "$UPSTREAM_DIR/LICENSE" "$OUTPUT_DIR/"
 
